@@ -23,3 +23,10 @@ pnpm build     # 构建
 - **桌面**: Tauri 2
 - **UI**: Tailwind CSS + shadcn-vue
 - **图标**: Lucide
+
+##已知bug
+1、编辑事项会出现两次toast
+
+##需要补充的功能
+1、新增事项/编辑事项窗口可以通过esc键关闭
+2、在我的项目页面，项目可以移动到其他目录
