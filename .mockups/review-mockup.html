@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>复盘页面 · 融入现有布局</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #f1f5f9; font-family: -apple-system, 'Segoe UI', sans-serif; color: #1e293b; display: flex; justify-content: center; padding: 24px; }
+  .app-window { width: 1000px; background: #fff; border-radius: 12px; box-shadow: 0 4px 24px rgba(0,0,0,0.12); overflow: hidden; display: flex; height: 650px; }
+
+  /* Sidebar */
+  .sidebar { width: 72px; background: #f8fafc; border-right: 1px solid #e2e8f0; display: flex; flex-direction: column; align-items: center; padding: 10px 0; flex-shrink: 0; }
+  .sidebar .logo { width: 36px; height: 36px; border-radius: 50%; background: #e2e8f0; display: flex; align-items: center; justify-content: center; margin-bottom: 8px; }
+  .sidebar .sep { width: 100%; height: 1px; background: #e2e8f0; margin: 4px 0; }
+  .sidebar .nav-item { width: 100%; padding: 8px 0; display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 11px; color: #94a3b8; cursor: default; }
+  .sidebar .nav-item.active { color: #fff; }
+  .sidebar .spacer { flex: 1; }
+  .sidebar .version { font-size: 9px; color: #cbd5e1; padding-bottom: 8px; }
+  .sidebar .nav-item.highlight { background: #dbeafe; color: #1d4ed8; border-radius: 4px; margin: 0 6px; padding: 6px 0; width: auto; }
+  .tag-new { display: inline-block; font-size: 9px; background: #dbeafe; color: #1d4ed8; padding: 1px 6px; border-radius: 4px; font-weight: 500; }
+
+  /* Main */
+  .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .page-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px 10px; border-bottom: 1px solid #e2e8f0; }
+  .page-header h1 { font-size: 16px; font-weight: 600; }
+  .time-tabs { display: flex; gap: 4px; }
+  .time-tabs span { padding: 3px 12px; border-radius: 6px; font-size: 12px; background: #f1f5f9; color: #64748b; cursor: default; }
+  .time-tabs span.active { background: #3b82f6; color: #fff; }
+  .time-tabs span.custom { border: 1px dashed #cbd5e1; background: #fff; color: #94a3b8; }
+
+  .scroll-area { flex: 1; overflow-y: auto; padding: 16px 20px 24px; }
+
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 16px; }
+  .stat-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; text-align: center; }
+  .stat-card .num { font-size: 22px; font-weight: 700; line-height: 1.2; }
+  .stat-card .lbl { font-size: 11px; color: #64748b; margin-top: 2px; }
+  .stat-card.blue .num { color: #3b82f6; }
+  .stat-card.green .num { color: #10b981; }
+  .stat-card.amber .num { color: #f59e0b; }
+  .stat-card.purple .num { color: #8b5cf6; }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+  .card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; }
+  .card-title { font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 10px; }
+
+  .bar-row { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; font-size: 11px; }
+  .bar-row .day { width: 18px; color: #64748b; text-align: right; flex-shrink: 0; font-size: 10px; }
+  .bar-row .bar-bg { flex: 1; height: 14px; background: #e2e8f0; border-radius: 3px; overflow: hidden; }
+  .bar-row .bar-fill { height: 100%; border-radius: 3px; }
+  .bar-row .val { width: 26px; color: #64748b; font-size: 10px; text-align: right; }
+
+  .p-row { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; font-size: 11px; }
+  .p-row .p-lbl { width: 68px; flex-shrink: 0; color: #475569; }
+  .p-row .p-bg { flex: 1; height: 14px; background: #e2e8f0; border-radius: 3px; overflow: hidden; }
+  .p-row .p-fill { height: 100%; border-radius: 3px; }
+  .p-row .p-val { width: 48px; color: #64748b; font-size: 10px; text-align: right; }
+
+  .section-divider { font-size: 12px; font-weight: 600; color: #334155; padding: 10px 0 8px; border-top: 1px solid #e2e8f0; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+  .section-divider .count { font-weight: 400; font-size: 11px; color: #64748b; }
+
+  .report-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-bottom: 8px; }
+  .report-card .rp-title { font-size: 13px; font-weight: 600; margin-bottom: 2px; }
+  .report-card .rp-meta { font-size: 11px; color: #64748b; margin-bottom: 8px; }
+  .report-card .nd { margin-bottom: 4px; font-size: 11px; }
+  .report-card .nd .nd-lbl { color: #475569; }
+  .report-card .nd .nd-val { float: right; color: #64748b; }
+  .report-card .nd-bar { height: 4px; background: #e2e8f0; border-radius: 2px; margin-top: 2px; }
+  .report-card .nd-fill { height: 100%; border-radius: 2px; }
+
+  .view-all { font-size: 11px; color: #3b82f6; cursor: default; text-align: right; margin-top: 8px; }
+  .note { text-align: center; margin-top: 12px; font-size: 11px; color: #94a3b8; }
+</style>
+</head>
+<body>
+
+<div class="app-window">
+  <!-- Sidebar (same as existing) -->
+  <div class="sidebar">
+    <div class="logo"><svg width="22" height="22" fill="#94a3b8" viewBox="0 0 24 24"><path d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z"/></svg></div>
+    <div class="sep"></div>
+    <div class="nav-item">🍅番茄时钟</div>
+    <div class="nav-item">📋事项清单</div>
+    <div class="nav-item">📊项目流程</div>
+    <div class="nav-item active highlight">📈复盘 <span class="tag-new">新</span></div>
+    <div class="spacer"></div>
+    <div class="sep"></div>
+    <div class="version">v0.1.0</div>
+  </div>
+
+  <!-- Review Page -->
+  <div class="main">
+    <div class="page-header">
+      <h1>复盘</h1>
+      <div class="time-tabs">
+        <span class="active">今日</span>
+        <span>本周</span>
+        <span>本月</span>
+        <span class="custom">自定义 ▼</span>
+      </div>
+    </div>
+    <div class="scroll-area">
+      <div class="stats">
+        <div class="stat-card blue"><div class="num">15</div><div class="lbl">完成事项</div></div>
+        <div class="stat-card green"><div class="num">4.5h</div><div class="lbl">专注时长</div></div>
+        <div class="stat-card amber"><div class="num">3</div><div class="lbl">进行中项目</div></div>
+        <div class="stat-card purple"><div class="num">1</div><div class="lbl">已完成项目</div></div>
+      </div>
+
+      <div class="two-col">
+        <div class="card">
+          <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;">
+            <span>专注 &amp; 完成趋势（本周）</span>
+            <span style="font-size:10px;font-weight:400;display:flex;gap:10px;">
+              <span style="display:flex;align-items:center;gap:3px;"><span style="display:inline-block;width:10px;height:3px;border-radius:2px;background:#3b82f6"></span>专注</span>
+              <span style="display:flex;align-items:center;gap:3px;"><span style="display:inline-block;width:10px;height:3px;border-radius:2px;background:#10b981"></span>事项</span>
+            </span>
+          </div>
+          <svg width="100%" height="150" viewBox="0 0 360 150" style="margin-top:4px;">
+            <line x1="40" y1="25" x2="350" y2="25" stroke="#e2e8f0" stroke-width="0.5"/>
+            <line x1="40" y1="57" x2="350" y2="57" stroke="#e2e8f0" stroke-width="0.5"/>
+            <line x1="40" y1="89" x2="350" y2="89" stroke="#e2e8f0" stroke-width="0.5"/>
+            <line x1="40" y1="121" x2="350" y2="121" stroke="#e2e8f0" stroke-width="0.5"/>
+            <text x="37" y="29" text-anchor="end" font-size="9" fill="#94a3b8">2h/5项</text>
+            <text x="37" y="61" text-anchor="end" font-size="9" fill="#94a3b8">1.5h/4项</text>
+            <text x="37" y="93" text-anchor="end" font-size="9" fill="#94a3b8">1h/2项</text>
+            <text x="37" y="125" text-anchor="end" font-size="9" fill="#94a3b8">0h/0项</text>
+            <text x="60" y="140" text-anchor="middle" font-size="9" fill="#94a3b8">一</text>
+            <text x="100" y="140" text-anchor="middle" font-size="9" fill="#94a3b8">二</text>
+            <text x="140" y="140" text-anchor="middle" font-size="9" fill="#94a3b8">三</text>
+            <text x="180" y="140" text-anchor="middle" font-size="9" fill="#94a3b8">四</text>
+            <text x="220" y="140" text-anchor="middle" font-size="9" fill="#94a3b8">五</text>
+            <text x="260" y="140" text-anchor="middle" font-size="9" fill="#94a3b8">六</text>
+            <text x="300" y="140" text-anchor="middle" font-size="9" fill="#94a3b8">日</text>
+            <polyline points="60,25 100,49 140,73 180,25 220,121 260,97 300,121" fill="none" stroke="#3b82f6" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+            <circle cx="60" cy="25" r="4" fill="#3b82f6" stroke="#fff" stroke-width="1.5"/>
+            <circle cx="100" cy="49" r="4" fill="#3b82f6" stroke="#fff" stroke-width="1.5"/>
+            <circle cx="140" cy="73" r="4" fill="#3b82f6" stroke="#fff" stroke-width="1.5"/>
+            <circle cx="180" cy="25" r="4" fill="#3b82f6" stroke="#fff" stroke-width="1.5"/>
+            <circle cx="220" cy="121" r="4" fill="#94a3b8" stroke="#fff" stroke-width="1.5"/>
+            <circle cx="260" cy="97" r="4" fill="#3b82f6" stroke="#fff" stroke-width="1.5"/>
+            <circle cx="300" cy="121" r="4" fill="#94a3b8" stroke="#fff" stroke-width="1.5"/>
+            <polyline points="60,41 100,81 140,25 180,41 220,121 260,101 300,121" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+            <circle cx="60" cy="41" r="4" fill="#10b981" stroke="#fff" stroke-width="1.5"/>
+            <circle cx="100" cy="81" r="4" fill="#10b981" stroke="#fff" stroke-width="1.5"/>
+            <circle cx="140" cy="25" r="4" fill="#10b981" stroke="#fff" stroke-width="1.5"/>
+            <circle cx="180" cy="41" r="4" fill="#10b981" stroke="#fff" stroke-width="1.5"/>
+            <circle cx="220" cy="121" r="4" fill="#94a3b8" stroke="#fff" stroke-width="1.5"/>
+            <circle cx="260" cy="101" r="4" fill="#10b981" stroke="#fff" stroke-width="1.5"/>
+            <circle cx="300" cy="121" r="4" fill="#94a3b8" stroke="#fff" stroke-width="1.5"/>
+          </svg>
+        </div>
+        <div class="card">
+          <div class="card-title">优先级分布（本周）</div>
+          <div class="p-row"><span class="p-lbl">🔴 紧急重要</span><div class="p-bg"><div class="p-fill" style="width:80%;background:#ef4444"></div></div><span class="p-val">12项 48%</span></div>
+          <div class="p-row"><span class="p-lbl">🟡 重要</span><div class="p-bg"><div class="p-fill" style="width:60%;background:#f59e0b"></div></div><span class="p-val">8项 32%</span></div>
+          <div class="p-row"><span class="p-lbl">🟢 紧急</span><div class="p-bg"><div class="p-fill" style="width:30%;background:#10b981"></div></div><span class="p-val">3项 12%</span></div>
+          <div class="p-row"><span class="p-lbl">⚪ 无</span><div class="p-bg"><div class="p-fill" style="width:20%;background:#94a3b8"></div></div><span class="p-val">2项 8%</span></div>
+        </div>
+      </div>
+
+      <div class="section-divider">📊 项目复盘 <span class="count">（3 个进行中 · 1 个已完成）</span></div>
+
+      <!-- 项目复盘 - 进行中 -->
+      <div style="font-size:11px;font-weight:600;color:#64748b;margin-bottom:6px;">进行中</div>
+
+      <div class="report-card">
+        <div class="rp-title">🚀 Q4 产品上线</div>
+        <div class="rp-meta">进行中 · 已持续 12 天 · 2/4 节点完成</div>
+        <div class="nd"><span class="nd-lbl">① 需求评审</span><span class="nd-val">已完成 3 天</span><div class="nd-bar"><div class="nd-fill" style="width:25%;background:#10b981"></div></div></div>
+        <div class="nd"><span class="nd-lbl">② 开发</span><span class="nd-val">进行中 · 已 7 天</span><div class="nd-bar"><div class="nd-fill" style="width:50%;background:#3b82f6"></div></div></div>
+        <div class="nd"><span class="nd-lbl">③ 测试</span><span class="nd-val" style="color:#94a3b8;">待开始</span><div class="nd-bar"></div></div>
+        <div class="nd"><span class="nd-lbl">④ 发布</span><span class="nd-val" style="color:#94a3b8;">待开始</span><div class="nd-bar"></div></div>
+      </div>
+
+      <div class="report-card">
+        <div class="rp-title">🎨 官网改版</div>
+        <div class="rp-meta">进行中 · 已持续 5 天 · 1/3 节点完成</div>
+        <div class="nd"><span class="nd-lbl">① 设计稿</span><span class="nd-val">已完成 3 天</span><div class="nd-bar"><div class="nd-fill" style="width:30%;background:#10b981"></div></div></div>
+        <div class="nd"><span class="nd-lbl">② 前端开发</span><span class="nd-val">进行中 · 已 2 天</span><div class="nd-bar"><div class="nd-fill" style="width:20%;background:#3b82f6"></div></div></div>
+        <div class="nd"><span class="nd-lbl">③ 上线</span><span class="nd-val" style="color:#94a3b8;">待开始</span><div class="nd-bar"></div></div>
+      </div>
+
+      <!-- 项目复盘 - 已完成 -->
+      <div style="font-size:11px;font-weight:600;color:#64748b;margin:12px 0 6px;">已完成</div>
+
+      <div class="report-card">
+        <div class="rp-title">✅ Q3 营销活动</div>
+        <div class="rp-meta">已完成 · 总耗时 21 天 · 5/5 节点完成</div>
+        <div><div class="nd"><span class="nd-lbl">① 方案策划</span><span class="nd-val">3 天</span><div class="nd-bar"><div class="nd-fill" style="width:15%;background:#10b981"></div></div></div>
+        <div class="nd"><span class="nd-lbl">② 素材制作</span><span class="nd-val">7 天</span><div class="nd-bar"><div class="nd-fill" style="width:33%;background:#10b981"></div></div></div>
+        <div class="nd"><span class="nd-lbl">③ 审核</span><span class="nd-val">2 天</span><div class="nd-bar"><div class="nd-fill" style="width:10%;background:#10b981"></div></div></div>
+        <div class="nd"><span class="nd-lbl">④ 发布</span><span class="nd-val">1 天</span><div class="nd-bar"><div class="nd-fill" style="width:5%;background:#10b981"></div></div></div>
+        <div class="nd"><span class="nd-lbl">⑤ 数据追踪</span><span class="nd-val">8 天</span><div class="nd-bar"><div class="nd-fill" style="width:38%;background:#10b981"></div></div></div></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div class="note">← 左侧为现有侧边栏 · 右侧为复盘页面实际效果 → &nbsp;|&nbsp; 数值为示意</div>
+</body>
+</html>

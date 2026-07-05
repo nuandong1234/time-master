@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>番茄钟完成弹窗 · 配色对比</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #f1f5f9;
+    font-family: -apple-system, 'Segoe UI', 'PingFang SC', sans-serif;
+    color: #1e293b;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 24px;
+  }
+  h1 { font-size: 20px; font-weight: 600; margin-bottom: 8px; }
+  .sub { font-size: 13px; color: #64748b; margin-bottom: 32px; }
+  .row {
+    display: flex;
+    gap: 48px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .col { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  .col-label { font-size: 14px; font-weight: 600; color: #334155; letter-spacing: 0.5px; }
+
+  /* 共享弹窗基底 */
+  .modal {
+    width: 340px;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.10);
+    padding: 20px;
+  }
+
+  /* ── 当前版本（灰度系） ── */
+  .current .title { font-size: 14px; color: #1e293b; line-height: 1.6; }
+  .current .sub-text { font-size: 12px; color: #94a3b8; margin-top: 4px; margin-bottom: 16px; }
+  .current .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+  .current .btn-cancel {
+    font-size: 14px; padding: 8px 16px; border-radius: 8px;
+    border: 1px solid #e2e8f0; background: #fff; color: #94a3b8;
+    cursor: default;
+  }
+  .current .btn-confirm {
+    font-size: 14px; padding: 8px 16px; border-radius: 8px;
+    border: none; background: #1e293b; color: #fff;
+    cursor: default;
+  }
+
+  /* ── 理想版本 ── */
+  .ideal { overflow: hidden; padding: 0; }
+  .ideal .bar { height: 3px; background: linear-gradient(90deg, #22c55e, #16a34a); }
+  .ideal .inner { padding: 24px 20px 20px; }
+  .ideal .icon-row { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .ideal .icon-row .check-circle {
+    width: 28px; height: 28px; border-radius: 50%;
+    background: #22c55e; display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .ideal .icon-row .check-circle svg { width: 14px; height: 14px; stroke: #fff; stroke-width: 3; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+  .ideal .icon-row .title { font-size: 15px; font-weight: 600; color: #1e293b; }
+  .ideal .desc { font-size: 13px; color: #64748b; line-height: 1.6; margin-bottom: 16px; }
+  .ideal .desc strong { font-weight: 600; color: #1e293b; }
+  .ideal .badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 12px; color: #16a34a; background: #f0fdf4;
+    border: 1px solid #bbf7d0; border-radius: 6px;
+    padding: 4px 10px; margin-bottom: 18px;
+  }
+  .ideal .badge svg { width: 13px; height: 13px; stroke: #16a34a; stroke-width: 2; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+  .ideal .actions { display: flex; justify-content: flex-end; align-items: center; gap: 6px; border-top: 1px solid #f1f5f9; padding-top: 14px; }
+  .ideal .btn-cancel {
+    font-size: 13px; padding: 7px 14px; border-radius: 7px;
+    border: 1px solid #e2e8f0; background: #fff; color: #64748b;
+    cursor: default; font-weight: 450;
+  }
+  .ideal .btn-confirm {
+    font-size: 13px; padding: 7px 18px; border-radius: 7px;
+    border: none; background: #16a34a; color: #fff; font-weight: 500;
+    cursor: default;
+  }
+
+  .tag { display: inline-block; font-size: 11px; padding: 2px 10px; border-radius: 4px; font-weight: 500; }
+  .tag-current { background: #f1f5f9; color: #64748b; }
+  .tag-ideal { background: #dcfce7; color: #16a34a; }
+
+  .notes {
+    margin-top: 40px; padding: 20px 28px; background: #fff;
+    border: 1px solid #e2e8f0; border-radius: 10px; max-width: 740px;
+    font-size: 13px; color: #475569; line-height: 1.8;
+  }
+  .notes code { background: #f1f5f9; padding: 1px 5px; border-radius: 3px; font-size: 12px; }
+  .notes .diff-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+  .notes .diff-table th,
+  .notes .diff-table td { text-align: left; padding: 6px 12px; border-bottom: 1px solid #e2e8f0; font-size: 13px; }
+  .notes .diff-table th { background: #f8fafc; font-weight: 600; color: #334155; }
+</style>
+</head>
+<body>
+
+  <h1>番茄钟完成弹窗 · 配色对比</h1>
+  <p class="sub">结构完全一致，仅调整颜色</p>
+
+  <div class="row">
+
+    <!-- 当前版本 -->
+    <div class="col">
+      <div class="col-label"><span class="tag tag-current">当前版本</span></div>
+      <div class="modal current">
+        <div class="title">
+          番茄钟已完成，是否将<span style="font-weight:500;">"写周报"</span>标记为已完成？
+        </div>
+        <div class="sub-text">完成后将同步推进项目流程</div>
+        <div class="actions">
+          <div class="btn-cancel">取消</div>
+          <div class="btn-confirm">标记完成</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 理想版本 -->
+    <div class="col">
+      <div class="col-label"><span class="tag tag-ideal">理想版本</span></div>
+      <div class="modal ideal">
+        <div class="bar"></div>
+        <div class="inner">
+          <div class="icon-row">
+            <div class="check-circle">
+              <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+            </div>
+            <span class="title">番茄钟已完成</span>
+          </div>
+          <div class="desc">
+            是否将"<strong>写周报</strong>"标记为已完成？
+          </div>
+          <div class="badge">
+            <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+            完成后将同步推进项目流程
+          </div>
+          <div class="actions">
+            <div class="btn-cancel">取消</div>
+            <div class="btn-confirm">标记完成</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="notes">
+    <div style="font-weight:600; margin-bottom:8px;">改了什么：</div>
+    <table class="diff-table">
+      <tr><th>元素</th><th>当前</th><th>优化后</th></tr>
+      <tr>
+        <td><strong>顶部装饰</strong></td>
+        <td>无</td>
+        <td>4px 绿色渐变条，卡出头</td>
+      </tr>
+      <tr>
+        <td><strong>标题区域</strong></td>
+        <td>纯文字段落</td>
+        <td>对勾图标 + "番茄钟已完成" 独立标题</td>
+      </tr>
+      <tr>
+        <td><strong>询问文字</strong></td>
+        <td>全体同色同字号</td>
+        <td>灰色正文 + 事项名加粗，层次分明</td>
+      </tr>
+      <tr>
+        <td><strong>流程提示</strong></td>
+        <td>灰色小字</td>
+        <td>绿色徽章 (bg-green-50)</td>
+      </tr>
+      <tr>
+        <td><strong>「标记完成」按钮</strong></td>
+        <td><code>bg-primary</code> (黑色)</td>
+        <td><code>bg-green-600</code> 绿色</td>
+      </tr>
+      <tr>
+        <td><strong>「取消」按钮</strong></td>
+        <td>灰边框</td>
+        <td>无边框透明</td>
+      </tr>
+    </table>
+  </div>
+
+</body>
+</html>
