@@ -2,6 +2,7 @@
 import { useRoute, useRouter } from "vue-router";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { version } from "../../../package.json";
 
 const route = useRoute();
 const router = useRouter();
@@ -70,7 +71,7 @@ function navigate(path: string) {
     <Separator class="bg-sidebar-border" />
 
     <div class="px-3 py-2">
-      <p class="text-[10px] text-sidebar-foreground/40">v0.1.0</p>
+      <p class="text-[10px] text-sidebar-foreground/40">v{{ version }}</p>
     </div>
   </aside>
 </template>
