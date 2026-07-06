@@ -5,7 +5,7 @@ import { emit } from "@tauri-apps/api/event"
 import { save, open } from "@tauri-apps/plugin-dialog"
 import {
   loadSettings, setTheme, setMinimizeToTray,
-  useSettings
+  useSettings, applyTheme
 } from "@/store/settings"
 import { showToast } from "@/store/toast"
 import { loadItems } from "@/store/items"
@@ -98,6 +98,9 @@ async function handleReset() {
     await loadPomodoroSettings(true)
     await initWorkflow(true)
     await loadSettings(true)
+    // 恢复默认后同步应用到功能和后端
+    applyTheme(theme.value)
+    await invoke("set_minimize_to_tray", { enabled: minimizeToTray.value })
     emit("reset-all-data")
     showToast("数据已重置", "success")
   } catch (e) {

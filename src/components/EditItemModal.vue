@@ -122,7 +122,6 @@ function handleSave() {
     priority: form.value.priority,
     repeatType: form.value.repeatType,
   })
-  showToast('已保存', 'success')
   close()
 }
 

@@ -52,6 +52,8 @@ onMounted(async () => {
     await resetExpiredSynced()
     await loadPomodoroSettings(true)
     await loadSettings(true)
+    applyTheme(theme.value)
+    await invoke("set_minimize_to_tray", { enabled: minimizeToTray.value })
   })
 })
 </script>

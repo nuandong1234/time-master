@@ -77,7 +77,7 @@ fn default_content(file: &str) -> &'static str {
         "data/items.json" => r#"{"items":[],"nextId":1}"#,
         "data/pomodoro.json" => r#"{"pomodoroCompleted":0,"pomodoroDate":"","totalFocusSeconds":0,"focusDate":"","focusMinutes":25,"breakMinutes":5,"totalRounds":4}"#,
         "data/workflow.json" => r#"{"categories":[],"projects":[],"nextCategoryId":1,"nextProjectId":1,"nextStepId":1,"nextNodeId":1}"#,
-        "data/settings.json" => r#"{"theme":"system","minimizeToTray":true,"shortcuts":[{"id":"toggle-window","label":"显示/隐藏窗口","keys":""},{"id":"toggle-pomodoro","label":"暂停/继续番茄钟","keys":""}]}"#,
+        "data/settings.json" => r#"{"theme":"light","minimizeToTray":false,"shortcuts":[{"id":"toggle-window","label":"显示/隐藏窗口","keys":""},{"id":"toggle-pomodoro","label":"暂停/继续番茄钟","keys":""}]}"#,
         _ => "{}",
     }
 }
@@ -297,7 +297,7 @@ fn open_settings_window_impl(app: &tauri::AppHandle) -> Result<(), String> {
     .maximizable(false)
     .decorations(true);
 
-    let window = builder.build().map_err(|e| e.to_string())?;
+    let _window = builder.build().map_err(|e| e.to_string())?;
 
     Ok(())
 }
