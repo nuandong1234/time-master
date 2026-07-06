@@ -204,7 +204,6 @@ export async function renameCategory(id: number, name: string): Promise<boolean>
   const cat = state.categories.find(c => c.id === id)
   if (cat) cat.name = trimmed
   await saveWorkflow()
-  showToast('已重命名', 'success')
   return true
 }
 
@@ -290,7 +289,7 @@ export async function deleteProject(id: number) {
     state.selectedProjectId = nextProjectId
   }
   await saveWorkflow()
-  showToast('已删除流程', 'success')
+  showToast('已删除项目', 'success')
 }
 
 export async function addProjectToCategory(catId: number) {
@@ -299,7 +298,7 @@ export async function addProjectToCategory(catId: number) {
   if (!cat) return
   const id = state.nextProjectId++
   const existingNames = state.projects.filter(p => cat.projectIds.includes(p.id)).map(p => p.name)
-  const projectName = dedupName("新流程", existingNames)
+  const projectName = dedupName("新项目", existingNames)
   const project: WorkflowProject = {
     id,
     name: projectName,
@@ -317,7 +316,6 @@ export async function addProjectToCategory(catId: number) {
   const defaultNode = project.steps[0].nodes[0]
   addSystemLogEntry(defaultNode, `添加「${defaultNode.name}」`)
   await saveWorkflow()
-  showToast('已新建项目', 'success')
 }
 
 export function selectProject(id: number) {
@@ -396,6 +394,7 @@ export async function addStepAfter(stepIdx: number) {
   const firstNode = newStep.nodes[0]
   addSystemLogEntry(firstNode, `添加「${nodeName}」`)
   await saveWorkflow()
+  showToast('已添加节点', 'success')
 }
 
 export async function updateNodeName(stepIdx: number, nodeIdx: number, name: string) {
@@ -606,13 +605,48 @@ export async function addNodeComment(stepIdx: number, nodeIdx: number, author: s
 export async function renameProject(id: number, name: string): Promise<boolean> {
   const trimmed = name.trim()
   if (!trimmed) { showToast('名称不能为空'); return false }
-  const exists = state.projects.some(p => p.id !== id && p.name === trimmed)
-  if (exists) { showToast('名称已存在'); return false }
   const p = state.projects.find(p => p.id === id)
-  if (p) p.name = trimmed
+  if (!p) return false
+  const exists = state.projects.filter(proj => proj.categoryId === p.categoryId && proj.id !== id).some(proj => proj.name === trimmed)
+  if (exists) { showToast('名称已存在'); return false }
+  p.name = trimmed
   await saveWorkflow()
   showToast('已重命名', 'success')
   return true
+}
+
+export async function moveProjectToCategory(projectId: number, targetCategoryId: number) {
+  const project = state.projects.find(p => p.id === projectId)
+  if (!project) return
+  const oldCat = state.categories.find(c => c.id === project.categoryId)
+  const newCat = state.categories.find(c => c.id === targetCategoryId)
+  if (!oldCat || !newCat) return
+  if (oldCat.id === newCat.id) return
+
+  // 从原目录移除
+  const pi = oldCat.projectIds.indexOf(projectId)
+  if (pi !== -1) oldCat.projectIds.splice(pi, 1)
+
+  // 更新项目的 categoryId
+  project.categoryId = targetCategoryId
+
+  // 添加到目标目录
+  newCat.projectIds.push(projectId)
+
+  // 如果目标目录是「已完成」，自动标记完成状态
+  if (targetCategoryId === DONE_CATEGORY_ID) {
+    project.status = "done"
+    project.completedAt = project.completedAt || now()
+  }
+
+  // 如果从「已完成」移出到普通目录，重置完成状态
+  if (oldCat.id === DONE_CATEGORY_ID && targetCategoryId !== DONE_CATEGORY_ID) {
+    project.status = project.steps.some(s => s.nodes.some(n => n.status === 'active')) ? "active" : "wait"
+    project.completedAt = undefined
+  }
+
+  await saveWorkflow()
+  showToast('已移动', 'success')
 }
 
 export async function removeNodeFromStep(stepIdx: number, nodeIdx: number) {
@@ -693,6 +727,7 @@ export function useWorkflow() {
     renameCategory,
     removeCategory,
     addProjectToCategory,
+    moveProjectToCategory,
     deleteProject,
     selectProject,
     selectStep,

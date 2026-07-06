@@ -6,12 +6,12 @@ import AppLayout from "@/components/layout/AppLayout.vue";
 import ToastContainer from "@/components/ToastContainer.vue"
 import { useItems } from "@/store/items"
 import { loadPomodoroSettings } from "@/store/pomodoro"
-import { loadSettings, applyTheme } from "@/store/settings"
+import { loadSettings, applyTheme, setWindowSize } from "@/store/settings"
 import { useSettings } from "@/store/settings"
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow"
 
 const { loadItems, resetExpiredSynced } = useItems()
-const { theme, minimizeToTray } = useSettings()
+const { theme, minimizeToTray, windowSize, customWindowWidth, customWindowHeight } = useSettings()
 
 // 检查当前窗口是否为独立设置窗口
 const isSettingsWindow = ref(getCurrentWebviewWindow().label === "settings")
@@ -46,6 +46,45 @@ onMounted(async () => {
     applyTheme(event.payload as "light" | "dark" | "system")
   })
 
+  // 监听主窗口手动调整大小事件（所有窗口都监听，确保及时同步）
+  listen<{width: number, height: number, maximized: boolean}>("window-resized", (event) => {
+    const { width, height, maximized } = event.payload
+
+    if (maximized) {
+      setWindowSize("maximized")
+      return
+    }
+
+    // 检查是否匹配预设尺寸（允许 5px 容差）
+    const presets: Array<{key: "small" | "medium" | "large", w: number, h: number}> = [
+      { key: "small", w: 1000, h: 650 },
+      { key: "medium", w: 1200, h: 800 },
+      { key: "large", w: 1400, h: 900 },
+    ]
+    const matched = presets.find(p => Math.abs(p.w - width) <= 5 && Math.abs(p.h - height) <= 5)
+
+    if (matched) {
+      setWindowSize(matched.key)
+    } else {
+      setWindowSize("custom", width, height)
+    }
+  })
+
+  // 应用保存的窗口尺寸（仅主窗口）
+  if (!isSettingsWindow.value) {
+    const ws = windowSize.value
+    if (ws === "custom") {
+      invoke("set_window_size", {
+        preset: "custom",
+        width: customWindowWidth.value,
+        height: customWindowHeight.value,
+      }).catch(() => {})
+    } else if (ws !== "medium") {
+      // medium 是默认尺寸，不需要额外设置
+      invoke("set_window_size", { preset: ws }).catch(() => {})
+    }
+  }
+
   // 监听其他窗口的数据重置通知
   listen("reset-all-data", async () => {
     await loadItems(true)
@@ -54,6 +93,11 @@ onMounted(async () => {
     await loadSettings(true)
     applyTheme(theme.value)
     await invoke("set_minimize_to_tray", { enabled: minimizeToTray.value })
+    // 窗口尺寸恢复默认
+    setWindowSize("medium")
+    if (!isSettingsWindow.value) {
+      await invoke("set_window_size", { preset: "medium" })
+    }
   })
 })
 </script>

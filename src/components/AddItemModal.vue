@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, nextTick } from "vue"
+import { ref, computed, watch, nextTick, onMounted, onUnmounted } from "vue"
 import { showToast } from "@/store/toast"
 import { useCalendar } from "@/composables/useCalendar"
 
@@ -82,6 +82,7 @@ function close() {
 }
 
 function handleKeydown(e: KeyboardEvent) {
+  if (!props.modelValue) return
   if (e.key === "Escape") {
     close()
     return
@@ -96,6 +97,14 @@ function handleKeydown(e: KeyboardEvent) {
     }
   }
 }
+
+onMounted(() => {
+  document.addEventListener("keydown", handleKeydown)
+})
+
+onUnmounted(() => {
+  document.removeEventListener("keydown", handleKeydown)
+})
 
 function handleCreate() {
   if (!form.value.name.trim()) {
@@ -145,7 +154,7 @@ watch(() => props.modelValue, (val) => {
 </script>
 
 <template>
-  <div v-if="modelValue" class="fixed inset-0 z-50 flex items-center justify-center" @keydown="handleKeydown">
+  <div v-if="modelValue" class="fixed inset-0 z-50 flex items-center justify-center">
     <div class="absolute inset-0 bg-black/50" @click="close"></div>
     <div class="relative bg-card border border-border rounded-lg shadow-lg w-[520px] p-5">
       <h3 class="text-lg font-semibold text-card-foreground text-center mb-4">新增事项</h3>

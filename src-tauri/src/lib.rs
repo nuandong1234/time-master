@@ -3,10 +3,12 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::menu::{MenuBuilder, MenuItemBuilder};
 use tauri::{Manager, WebviewUrl};
+use tauri::Emitter;
 use tauri_plugin_notification::NotificationExt;
 use tauri_plugin_autostart::ManagerExt;
 
 static MINIMIZE_TO_TRAY: AtomicBool = AtomicBool::new(true);
+static IS_PROGRAMMATIC_RESIZE: AtomicBool = AtomicBool::new(false);
 
 use std::collections::HashMap;
 
@@ -77,7 +79,7 @@ fn default_content(file: &str) -> &'static str {
         "data/items.json" => r#"{"items":[],"nextId":1}"#,
         "data/pomodoro.json" => r#"{"pomodoroCompleted":0,"pomodoroDate":"","totalFocusSeconds":0,"focusDate":"","focusMinutes":25,"breakMinutes":5,"totalRounds":4}"#,
         "data/workflow.json" => r#"{"categories":[],"projects":[],"nextCategoryId":1,"nextProjectId":1,"nextStepId":1,"nextNodeId":1}"#,
-        "data/settings.json" => r#"{"theme":"light","minimizeToTray":false,"shortcuts":[{"id":"toggle-window","label":"显示/隐藏窗口","keys":""},{"id":"toggle-pomodoro","label":"暂停/继续番茄钟","keys":""}]}"#,
+        "data/settings.json" => r#"{"theme":"light","minimizeToTray":false,"windowSize":"medium","customWindowWidth":1200,"customWindowHeight":800,"shortcuts":[{"id":"toggle-window","label":"显示/隐藏窗口","keys":""},{"id":"toggle-pomodoro","label":"暂停/继续番茄钟","keys":""}]}"#,
         _ => "{}",
     }
 }
@@ -309,6 +311,54 @@ fn set_minimize_to_tray(enabled: bool) -> Result<(), String> {
 }
 
 #[tauri::command]
+async fn set_window_size(app: tauri::AppHandle, preset: String, width: Option<f64>, height: Option<f64>) -> Result<(), String> {
+    IS_PROGRAMMATIC_RESIZE.store(true, Ordering::SeqCst);
+
+    let window = app.get_webview_window("main").ok_or("主窗口未找到")?;
+
+    match preset.as_str() {
+        "small" => {
+            window.set_size(tauri::LogicalSize::new(1000.0, 650.0)).map_err(|e| e.to_string())?;
+            window.center().map_err(|e| e.to_string())?;
+        }
+        "medium" => {
+            window.set_size(tauri::LogicalSize::new(1200.0, 800.0)).map_err(|e| e.to_string())?;
+            window.center().map_err(|e| e.to_string())?;
+        }
+        "large" => {
+            window.set_size(tauri::LogicalSize::new(1400.0, 900.0)).map_err(|e| e.to_string())?;
+            window.center().map_err(|e| e.to_string())?;
+        }
+        "maximized" => {
+            window.maximize().map_err(|e| e.to_string())?;
+        }
+        "custom" => {
+            if let (Some(w), Some(h)) = (width, height) {
+                window.set_size(tauri::LogicalSize::new(w, h)).map_err(|e| e.to_string())?;
+                window.center().map_err(|e| e.to_string())?;
+            }
+        }
+        _ => {}
+    }
+
+    // 如果在设置窗口中调整主窗口尺寸，重新聚焦到设置窗口
+    if let Some(settings) = app.get_webview_window("settings") {
+        let _ = settings.set_focus();
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+async fn get_window_size(app: tauri::AppHandle) -> Result<(f64, f64, bool), String> {
+    let window = app.get_webview_window("main").ok_or("主窗口未找到")?;
+    let physical_size = window.outer_size().map_err(|e| e.to_string())?;
+    let scale = window.scale_factor().map_err(|e| e.to_string())?;
+    let maximized = window.is_maximized().map_err(|e| e.to_string())?;
+    Ok((physical_size.width as f64 / scale, physical_size.height as f64 / scale, maximized))
+}
+
+#[tauri::command]
 fn batch_read_data_files() -> Result<HashMap<String, serde_json::Value>, String> {
     let base = get_base_dir()?;
     let files = [
@@ -359,6 +409,8 @@ pub fn run() {
             open_settings_window,
             get_autostart,
             open_data_folder,
+            set_window_size,
+            get_window_size,
         ])
         .setup(|app| {
             if cfg!(debug_assertions) {
@@ -423,17 +475,36 @@ pub fn run() {
             Ok(())
         })
         .on_window_event(|window, event| {
-            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                if window.label() == "main" && MINIMIZE_TO_TRAY.load(Ordering::SeqCst) {
-                    api.prevent_close();
-                    let _ = window.hide();
-                } else if window.label() == "main" {
-                    // 最小化到托盘关闭 → 同时关掉设置窗口，让应用退出
-                    if let Some(settings) = window.app_handle().get_webview_window("settings") {
-                        let _ = settings.close();
+            match event {
+                tauri::WindowEvent::Resized(size) => {
+                    if window.label() == "main" {
+                        if IS_PROGRAMMATIC_RESIZE.load(Ordering::SeqCst) {
+                            IS_PROGRAMMATIC_RESIZE.store(false, Ordering::SeqCst);
+                        } else {
+                            // 手动调整窗口 → 通知前端（转换为逻辑尺寸）
+                            let app = window.app_handle();
+                            let maximized = window.is_maximized().unwrap_or(false);
+                            let scale = window.scale_factor().unwrap_or(1.0);
+                            let payload = serde_json::json!({
+                                "width": size.width as f64 / scale,
+                                "height": size.height as f64 / scale,
+                                "maximized": maximized
+                            });
+                            let _ = app.emit("window-resized", payload);
+                        }
                     }
                 }
-                // 设置窗口：直接关闭，不影响主窗口
+                tauri::WindowEvent::CloseRequested { api, .. } => {
+                    if window.label() == "main" && MINIMIZE_TO_TRAY.load(Ordering::SeqCst) {
+                        api.prevent_close();
+                        let _ = window.hide();
+                    } else if window.label() == "main" {
+                        if let Some(settings) = window.app_handle().get_webview_window("settings") {
+                            let _ = settings.close();
+                        }
+                    }
+                }
+                _ => {}
             }
         })
         .run(tauri::generate_context!())

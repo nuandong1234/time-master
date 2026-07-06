@@ -18,6 +18,7 @@ const {
   getDurationDays,
   selectProject, selectStep,
   addNodeToStep, addStepAfter, completeNodeAndAdvance, renameProject, removeNodeFromStep, addCategory, addProjectToCategory, renameCategory, removeCategory, deleteProject,
+  moveProjectToCategory,
 } = useWorkflow()
 
 const { lockedItemId } = usePomodoroStore()
@@ -141,11 +142,7 @@ function startRename(catId: number) {
 function startRenameProject(pid: number) {
   renamingProjectId.value = pid
   contextMenu.value = null
-  setTimeout(() => {
-    const el = document.querySelector(`[data-rename="proj-${pid}"]`) as HTMLInputElement
-    el?.focus()
-    el?.select()
-  }, 50)
+  pendingRenameProjectId.value = pid
 }
 
 function doDeleteProject(pid: number) {
@@ -153,8 +150,48 @@ function doDeleteProject(pid: number) {
   closeContextMenu()
 }
 
-function doNewProject(catId: number) {
-  addProjectToCategory(catId)
+// 判断项目是否已完成（所有步骤的所有节点状态均为 done）
+function isProjectCompleted(project: WorkflowProject) {
+  return project.steps.length > 0 && project.steps.every(
+    (s: WorkflowStep) => s.nodes.length > 0 && s.nodes.every((n: WorkflowNode) => n.status === "done")
+  )
+}
+
+// --- 「移动到」子菜单 ---
+const moveToSubmenuProjectId = ref(0)
+const targetCategoriesForMove = computed(() => {
+  if (!contextMenu.value?.projectId) return []
+  const project = projects.value.find(p => p.id === contextMenu.value!.projectId)
+  if (!project) return []
+  // 已完成项目禁止移动
+  if (isProjectCompleted(project)) return []
+  return categories.value.filter(c => c.id !== project.categoryId && c.id !== DONE_CATEGORY_ID)
+})
+
+async function handleMoveProject(projectId: number, targetCatId: number) {
+  // 已完成项目禁止移动
+  const project = projects.value.find(p => p.id === projectId)
+  if (project && isProjectCompleted(project)) {
+    showToast('已完成项目不可移动')
+    closeContextMenu()
+    return
+  }
+  await moveProjectToCategory(projectId, targetCatId)
+  moveToSubmenuProjectId.value = 0
+  closeContextMenu()
+
+  // 如果选中的项目正好是刚移动的项目，保持选中
+  // 如果移动后被折叠，自动展开目标目录
+  const targetCat = categories.value.find(c => c.id === targetCatId)
+  if (targetCat && collapsedCats.value.has(targetCat.id)) {
+    const newSet = new Set(collapsedCats.value)
+    newSet.delete(targetCat.id)
+    collapsedCats.value = newSet
+  }
+}
+
+async function doNewProject(catId: number) {
+  await addProjectToCategory(catId)
   if (collapsedCats.value.has(catId)) {
     collapsedCats.value.delete(catId)
     collapsedCats.value = new Set(collapsedCats.value)
@@ -164,10 +201,11 @@ function doNewProject(catId: number) {
   startReady.value = true
   selectStep(0)
 
-  // 焦点放到流程网格上，让 Tab 能立即添加节点
-  nextTick(() => {
-    flowGridRef.value?.focus()
-  })
+  // 新建后自动弹出重命名
+  const newId = selectedProjectId.value
+  if (newId) {
+    pendingRenameProjectId.value = newId
+  }
 }
 
 function handleAddCategory() {
@@ -209,22 +247,44 @@ watch(pendingRenameCatId, (cid) => {
 
 async function doRename(catId: number, el: HTMLInputElement) {
   if (renamingBusy.value) return
+  // ESC 已取消重命名（输入框被移除触发 blur），跳过保存不弹 toast
+  if (renamingCatId.value === 0) return
   renamingBusy.value = true
-  const ok = await renameCategory(catId, el.value)
-  if (ok) {
+  try {
+    const ok = await renameCategory(catId, el.value)
+    if (ok) {
+      renamingCatId.value = 0
+      await nextTick()
+    } else {
+      // 保存失败（名称重复等），把焦点放回去
+      el.focus()
+      el.select()
+    }
+  } catch (e) {
+    console.error('重命名目录失败', e)
     renamingCatId.value = 0
-    await nextTick()
   }
   renamingBusy.value = false
 }
 
 async function doRenameProject(pid: number, el: HTMLInputElement) {
   if (renamingProjectBusy.value) return
+  // ESC 已取消重命名（输入框被移除触发 blur），跳过保存不弹 toast
+  if (renamingProjectId.value === 0) return
   renamingProjectBusy.value = true
-  const ok = await renameProject(pid, el.value)
-  if (ok) {
+  try {
+    const ok = await renameProject(pid, el.value)
+    if (ok) {
+      renamingProjectId.value = 0
+      await nextTick()
+    } else {
+      // 保存失败（名称重复等），把焦点放回去
+      el.focus()
+      el.select()
+    }
+  } catch (e) {
+    console.error('重命名项目失败', e)
     renamingProjectId.value = 0
-    await nextTick()
   }
   renamingProjectBusy.value = false
 }
@@ -864,7 +924,8 @@ async function handleCompleteCurrentNode() {
                   :value="cat.name"
                   class="text-sm font-semibold text-sidebar-foreground/70 bg-transparent border border-blue-400 rounded px-1 py-0 outline-none w-full"
                   @blur="(e) => doRename(cat.id, e.target as HTMLInputElement)"
-                  @keydown.enter="(e) => doRename(cat.id, e.target as HTMLInputElement)"
+                  @keydown.enter="(e) => (e.target as HTMLInputElement).blur()"
+                  @keydown.escape="renamingCatId = 0"
                   @click.stop
                 />
               </template>
@@ -890,7 +951,8 @@ async function handleCompleteCurrentNode() {
                   :value="p.name"
                   class="text-sm text-sidebar-foreground/80 bg-transparent border border-blue-400 rounded px-1 py-0 outline-none flex-1 min-w-0 max-w-full"
                   @blur="(e) => doRenameProject(p.id, e.target as HTMLInputElement)"
-                  @keydown.enter="(e) => doRenameProject(p.id, e.target as HTMLInputElement)"
+                  @keydown.enter="(e) => (e.target as HTMLInputElement).blur()"
+                  @keydown.escape="renamingProjectId = 0"
                   @click.stop
                 />
               </template>
@@ -931,11 +993,42 @@ async function handleCompleteCurrentNode() {
             class="w-full text-left px-3 py-1.5 text-sm text-card-foreground hover:bg-muted cursor-pointer"
             @click="startRenameProject(contextMenu!.projectId!)"
           >重命名</button>
+          <!-- 移动到子菜单 -->
+          <div
+            v-if="contextMenu.projectId && !isProjectCompleted(projects.find(p => p.id === contextMenu!.projectId)!)"
+            class="relative"
+            @mouseenter="moveToSubmenuProjectId = contextMenu.projectId"
+            @mouseleave="moveToSubmenuProjectId = 0"
+          >
+            <button
+              class="w-full text-left px-3 py-1.5 text-sm text-card-foreground hover:bg-muted cursor-pointer flex items-center justify-between gap-2"
+            >
+              <span>移动到</span>
+              <svg class="size-3 text-sidebar-foreground/40" viewBox="0 0 10 10" fill="currentColor">
+                <path d="M3,1 L7,5 L3,9" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+            <div
+              v-if="moveToSubmenuProjectId === contextMenu.projectId"
+              class="absolute left-full top-0 z-50 bg-card border border-border rounded-lg shadow-lg py-1 min-w-[120px] max-h-[300px] overflow-y-auto"
+            >
+              <button
+                v-for="cat in targetCategoriesForMove"
+                :key="cat.id"
+                class="w-full text-left px-3 py-1.5 text-sm text-card-foreground hover:bg-muted cursor-pointer truncate"
+                @click="handleMoveProject(contextMenu!.projectId!, cat.id)"
+              >
+                {{ cat.name }}
+                <span v-if="cat.id === DONE_CATEGORY_ID" class="text-[11px] text-muted-foreground ml-1">(已完成)</span>
+              </button>
+              <div v-if="targetCategoriesForMove.length === 0" class="px-3 py-2 text-xs text-muted-foreground italic">没有其他目录</div>
+            </div>
+          </div>
           <div class="border-t border-border my-1"></div>
           <button
             class="w-full text-left px-3 py-1.5 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 cursor-pointer"
             @click="doDeleteProject(contextMenu!.projectId!)"
-          >删除流程</button>
+          >删除项目</button>
         </template>
       </div>
     </aside>

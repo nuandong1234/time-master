@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue"
+import { ref, onMounted, watch } from "vue"
 import { invoke } from "@tauri-apps/api/core"
 import { emit } from "@tauri-apps/api/event"
 import { save, open } from "@tauri-apps/plugin-dialog"
 import {
-  loadSettings, setTheme, setMinimizeToTray,
+  loadSettings, setTheme, setMinimizeToTray, setWindowSize,
   useSettings, applyTheme
 } from "@/store/settings"
 import { showToast } from "@/store/toast"
@@ -12,7 +12,14 @@ import { loadItems } from "@/store/items"
 import { loadPomodoroSettings } from "@/store/pomodoro"
 import { initWorkflow } from "@/store/workflow"
 
-const { theme, minimizeToTray } = useSettings()
+const { theme, minimizeToTray, windowSize } = useSettings()
+
+const currentWindowPreset = ref(windowSize.value)
+
+// 跟随外部变化同步下拉框
+watch(windowSize, (val) => {
+  currentWindowPreset.value = val
+})
 
 const themeOptions = [
   { value: "light" as const, label: "浅色", icon: "☀️" },
@@ -42,6 +49,43 @@ async function toggleMinimizeToTray() {
     showToast(newVal ? "关闭时最小化到托盘" : "关闭时直接退出", "success")
   } catch (e) {
     showToast("设置失败: " + String(e), "error")
+  }
+}
+
+const windowSizeOptions = [
+  { value: "small" as const, label: "小 (1000×650)" },
+  { value: "medium" as const, label: "中 (1200×800)" },
+  { value: "large" as const, label: "大 (1400×900)" },
+  { value: "maximized" as const, label: "最大化" },
+  { value: "custom" as const, label: "自定义" },
+]
+
+async function handleWindowSizeChange(e: Event) {
+  const preset = currentWindowPreset.value
+  // 选中后立即移除焦点，去掉选中框
+  ;(e.target as HTMLElement).blur()
+  try {
+    if (preset === "custom") {
+      // 获取当前窗口尺寸作为自定义尺寸
+      const [w, h, max] = await invoke<[number, number, boolean]>("get_window_size")
+      if (!max) {
+        setWindowSize("custom", w, h)
+      } else {
+        // 窗口最大化时，先恢复窗口（设为中尺寸），让用户可以手动拖拽调整
+        await invoke("set_window_size", { preset: "medium" })
+        // 将模式设为 custom（不传宽高，后续手动拖拽会通过 window-resized 事件自动保存尺寸）
+        setWindowSize("custom")
+        showToast("已取消最大化，请手动拖拽窗口到合适大小", "success")
+        return
+      }
+      showToast("请手动拖拽窗口到合适大小", "success")
+    } else {
+      await invoke("set_window_size", { preset })
+      setWindowSize(preset)
+      showToast(`窗口已切换至${windowSizeOptions.find(o => o.value === preset)?.label}`, "success")
+    }
+  } catch (e) {
+    showToast("调整窗口失败: " + String(e), "error")
   }
 }
 
@@ -101,6 +145,10 @@ async function handleReset() {
     // 恢复默认后同步应用到功能和后端
     applyTheme(theme.value)
     await invoke("set_minimize_to_tray", { enabled: minimizeToTray.value })
+    // 窗口尺寸恢复默认
+    currentWindowPreset.value = "medium"
+    setWindowSize("medium")
+    await invoke("set_window_size", { preset: "medium" })
     emit("reset-all-data")
     showToast("数据已重置", "success")
   } catch (e) {
@@ -111,6 +159,8 @@ async function handleReset() {
 onMounted(async () => {
   // 先加载配置，确保读到真实值
   await loadSettings()
+  // 同步下拉框
+  currentWindowPreset.value = windowSize.value
   // 同步最小化到托盘状态到后端
   try {
     await invoke("set_minimize_to_tray", { enabled: minimizeToTray.value })
@@ -180,6 +230,25 @@ onMounted(async () => {
               @click="setTheme(opt.value)"
             ><span>{{ opt.icon }}</span> {{ opt.label }}</button>
           </div>
+        </div>
+
+        <!-- 窗口尺寸 -->
+        <div class="flex items-center justify-between">
+          <div>
+            <h4 class="text-sm font-medium text-foreground">窗口尺寸</h4>
+            <p class="text-xs text-muted-foreground mt-0.5">调整窗口大小以适应不同屏幕</p>
+          </div>
+          <select
+            v-model="currentWindowPreset"
+            class="px-2.5 py-1.5 text-sm rounded-md border border-border bg-background text-foreground outline-none transition-colors cursor-pointer"
+            @change="handleWindowSizeChange($event)"
+          >
+            <option
+              v-for="opt in windowSizeOptions"
+              :key="opt.value"
+              :value="opt.value"
+            >{{ opt.label }}</option>
+          </select>
         </div>
       </div>
     </div>
