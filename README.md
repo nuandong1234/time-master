@@ -24,9 +24,6 @@ pnpm build     # 构建
 - **UI**: Tailwind CSS + shadcn-vue
 - **图标**: Lucide
 
-## 已知bug
-- 编辑事项会出现两次toast
-- 在设置页面重置数据后，关闭时最小化到托盘和主题没有回到默认
 
 ## 需要补充的功能
 - 新增事项/编辑事项窗口可以通过esc键关闭
