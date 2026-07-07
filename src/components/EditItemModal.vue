@@ -44,8 +44,40 @@ const {
   openCal: openCalBase, closeCal, handleCalWheel,
 } = useCalendar()
 
-function openCal(mode: "start" | "end") {
+const calPosition = ref({ top: 0, left: 0 })
+const calPanelRef = ref<HTMLElement | null>(null)
+
+function openCal(mode: "start" | "end", e: MouseEvent) {
   openCalBase(mode, form.value.startDate || undefined)
+  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+  const calW = 280
+  const left = Math.max(8, Math.min(rect.left, window.innerWidth - calW - 8))
+  // 先放到一个临时位置让日历渲染
+  calPosition.value = { top: rect.bottom + 4, left }
+  nextTick(() => {
+    if (!calPanelRef.value) return
+    const calH = calPanelRef.value.offsetHeight
+    // 优先上方弹出，空间不足时改到下方
+    calPosition.value = {
+      top: rect.top - calH - 4 >= 8 ? rect.top - calH - 4 : rect.bottom + 4,
+      left,
+    }
+  })
+  cleanupCalListeners()
+  document.addEventListener("mousedown", handleCalClickOutside)
+  window.addEventListener("resize", handleCalResize)
+}
+
+function handleCalClickOutside(e: MouseEvent) {
+  if (calPanelRef.value && !calPanelRef.value.contains(e.target as Node)) {
+    closeCal()
+    cleanupCalListeners()
+  }
+}
+
+function handleCalResize() {
+  closeCal()
+  cleanupCalListeners()
 }
 
 function selectDay(d: number) {
@@ -54,18 +86,26 @@ function selectDay(d: number) {
     form.value.startDate = dateStr
     form.value.endDate = dateStr
     closeCal()
+    cleanupCalListeners()
   } else if (calMode.value === "start") {
     form.value.startDate = dateStr
     if (form.value.endDate && form.value.endDate < dateStr) {
       form.value.endDate = ""
     }
     closeCal()
+    cleanupCalListeners()
   } else {
     if (dateStr >= form.value.startDate) {
       form.value.endDate = dateStr
       closeCal()
+      cleanupCalListeners()
     }
   }
+}
+
+function cleanupCalListeners() {
+  document.removeEventListener("mousedown", handleCalClickOutside)
+  window.removeEventListener("resize", handleCalResize)
 }
 
 const nameInputRef = ref<HTMLInputElement | null>(null)
@@ -98,6 +138,8 @@ onMounted(() => {
 
 onUnmounted(() => {
   document.removeEventListener("keydown", handleKeydown)
+  document.removeEventListener("mousedown", handleCalClickOutside)
+  window.removeEventListener("resize", handleCalResize)
 })
 
 function handleDelete() {
@@ -185,16 +227,21 @@ watch(() => props.modelValue, (val) => {
         <div>
           <label class="text-sm font-medium text-card-foreground">日期 <span class="text-red-500">*</span><span v-if="form.repeatType !== 'none'" class="text-xs text-muted-foreground ml-2">🔁{{ { daily: '每天', weekly: '每周', monthly: '每月' }[form.repeatType] }}</span></label>
           <div class="mt-1 flex items-center gap-2 text-sm">
-            <input :value="form.startDate" readonly placeholder="开始日期" class="flex-1 min-w-0 border border-border rounded-md px-3 py-1.5 text-sm bg-transparent text-card-foreground outline-none cursor-pointer placeholder:text-muted-foreground/50" @click="openCal('start')" />
+            <input :value="form.startDate" readonly placeholder="开始日期" class="flex-1 min-w-0 border border-border rounded-md px-3 py-1.5 text-sm bg-transparent text-card-foreground outline-none cursor-pointer placeholder:text-muted-foreground/50" @click="openCal('start', $event)" />
             <span class="text-muted-foreground shrink-0">至</span>
-            <input :value="form.endDate" readonly placeholder="结束日期" class="flex-1 min-w-0 border border-border rounded-md px-3 py-1.5 text-sm bg-transparent text-card-foreground outline-none cursor-pointer placeholder:text-muted-foreground/50" @click="openCal('end')" />
+            <input :value="form.endDate" readonly placeholder="结束日期" class="flex-1 min-w-0 border border-border rounded-md px-3 py-1.5 text-sm bg-transparent text-card-foreground outline-none cursor-pointer placeholder:text-muted-foreground/50" @click="openCal('end', $event)" />
           </div>
         </div>
 
-        <!-- 日历弹出窗口 -->
-        <div v-if="showCal" class="fixed inset-0 z-[60] flex items-center justify-center">
-          <div class="absolute inset-0" @click="showCal = false"></div>
-          <div class="relative bg-card border border-border rounded-lg shadow-lg p-4 w-[280px] select-none" @wheel.prevent="handleCalWheel">
+        <!-- 日历弹出窗口（紧贴输入框上方弹出） -->
+        <Teleport to="body">
+          <div
+            v-if="showCal"
+            ref="calPanelRef"
+            class="fixed z-[60] bg-card border border-border rounded-lg shadow-xl p-4 w-[280px] select-none"
+            :style="{ top: calPosition.top + 'px', left: calPosition.left + 'px' }"
+            @wheel.prevent="handleCalWheel"
+          >
             <div class="text-center text-sm font-medium text-card-foreground mb-2">{{ calTitle }}</div>
             <div class="grid grid-cols-7 gap-0 text-center text-xs">
               <span v-for="d in weekDays" :key="d" class="py-1 text-muted-foreground">{{ d }}</span>
@@ -221,7 +268,7 @@ watch(() => props.modelValue, (val) => {
               >{{ opt.label }}</button>
             </div>
           </div>
-        </div>
+        </Teleport>
 
         <!-- 优先级 -->
         <div>

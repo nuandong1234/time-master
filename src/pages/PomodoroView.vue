@@ -230,7 +230,10 @@ const sortedSyncedItems = computed(() => {
       </h3>
 
       <div class="text-sm text-muted-foreground border border-border rounded-md px-3 py-2 text-center">
-        <template v-if="linkedItem">
+        <template v-if="lockedItem">
+          <span class="text-card-foreground font-medium">{{ lockedItem.name }}</span>
+        </template>
+        <template v-else-if="linkedItem">
           <span class="text-card-foreground">{{ linkedItem.name }}</span>
         </template>
         <span v-else>无关联事项</span>

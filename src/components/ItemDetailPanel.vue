@@ -284,7 +284,7 @@ function handleCommentKeydown(e: KeyboardEvent) {
           @blur="saveField('name')"
         />
         <div class="flex items-center gap-1.5 mt-1 flex-wrap">
-          <span v-if="isLocked" class="text-[11px] text-green-500 bg-green-100 dark:bg-green-500/20 rounded px-1.5 leading-normal">🎯 专注中</span>
+          <span v-if="isLocked" class="text-[11px] text-green-500 bg-green-100 dark:bg-green-500/20 rounded px-1.5 leading-normal">专注中</span>
           <span v-if="isOverdueItem && !isReadonly" class="text-[11px] text-red-500 bg-red-100 dark:bg-red-500/20 rounded px-1.5 leading-normal">已逾期</span>
           <span v-if="item.workflowRef" class="text-[11px] text-muted-foreground bg-muted rounded px-1.5 leading-normal">🔗 {{ workflowProjectName }}</span>
           <!-- 🔁 不再显示在标题区，只显示在日期后面 -->
