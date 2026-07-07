@@ -170,7 +170,7 @@ const sortedSyncedItems = computed(() => {
                 </div>
                 <div class="text-sm text-muted-foreground mt-1 flex items-center gap-0.5">
                   <svg class="size-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5"/></svg>
-                  <template v-if="item.startDate === item.endDate">{{ item.startDate }}<span v-if="!item.done && item.repeatType && item.repeatType !== 'none'">  🔁</span></template>
+                  <template v-if="item.startDate === item.endDate">{{ item.startDate }}<span v-if="!item.done && item.repeatType && item.repeatType !== 'none'">  🔁 {{ { daily: '每天', weekly: '每周', monthly: '每月' }[item.repeatType] }}</span></template>
                   <template v-else>{{ item.startDate }} ~ {{ item.endDate }}</template>
                 </div>
             <div v-if="item.description" class="mt-1.5 flex items-start gap-1">
@@ -208,7 +208,7 @@ const sortedSyncedItems = computed(() => {
                 </div>
                 <div class="text-sm text-muted-foreground mt-1 flex items-center gap-0.5">
                   <svg class="size-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5"/></svg>
-                  <template v-if="item.startDate === item.endDate">{{ item.startDate }}<template v-if="!item.done && item.repeatType && item.repeatType !== 'none'">  🔁</template></template>
+                  <template v-if="item.startDate === item.endDate">{{ item.startDate }}<template v-if="!item.done && item.repeatType && item.repeatType !== 'none'">  🔁 {{ { daily: '每天', weekly: '每周', monthly: '每月' }[item.repeatType] }}</template></template>
                   <template v-else>{{ item.startDate }} ~ {{ item.endDate }}</template>
                 </div>
                 <div v-if="item.description" class="mt-1.5 flex items-start gap-1">
