@@ -251,14 +251,17 @@ export async function clearDoneItems() {
   await saveItems()
 }
 
-let nextCommentId = 1
+function getNextCommentId(): number {
+  const allIds = state.items.flatMap(i => i.comments?.map(c => c.id) ?? [])
+  return allIds.length > 0 ? Math.max(...allIds) + 1 : 1
+}
 
 export async function addItemComment(itemId: number, content: string) {
   const item = state.items.find(i => i.id === itemId)
   if (!item) return
   if (!item.comments) item.comments = []
   const comment: ItemComment = {
-    id: nextCommentId++,
+    id: getNextCommentId(),
     content,
     author: "我",
     createdAt: formatDateTime(new Date()),

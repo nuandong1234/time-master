@@ -57,8 +57,11 @@ async function savePomodoro() {
 
 export async function addFocusSeconds(seconds: number) {
   const today = formatDate(new Date())
-  if (state.focusDate !== today) { state.totalFocusSeconds = seconds; state.focusDate = today }
-  else { state.totalFocusSeconds += seconds }
+  if (state.focusDate !== today) {
+    state.totalFocusSeconds = 0
+    state.focusDate = today
+  }
+  state.totalFocusSeconds += seconds
   await savePomodoro()
 }
 

@@ -206,7 +206,8 @@ function openCal(mode: "start" | "end", e: MouseEvent) {
   const panelW = 230
   const left = Math.max(8, Math.min(rect.left, window.innerWidth - panelW - 8))
   calPosition.value = { top: rect.bottom + 4, left }
-
+  // 先移除旧监听器再注册，防止重复注册导致泄漏
+  document.removeEventListener("mousedown", handleCalClickOutside)
   document.addEventListener("mousedown", handleCalClickOutside)
 }
 

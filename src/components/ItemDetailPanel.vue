@@ -1,9 +1,13 @@
 <script setup lang="ts">
-import { ref, computed, watch } from "vue"
+import { ref, computed, watch, onUnmounted } from "vue"
 import type { Item } from "@/store/items"
 import { showToast } from "@/store/toast"
 import { isOverdue, getWorkflowProjectName } from "@/lib/item-utils"
 import { useCalendar } from "@/composables/useCalendar"
+
+onUnmounted(() => {
+  document.removeEventListener("mousedown", handleCalClickOutside)
+})
 
 const props = defineProps<{
   item: Item | null
@@ -70,6 +74,8 @@ function openCal(mode: "start" | "end", e: MouseEvent) {
   const calW = 280
   const left = Math.max(8, Math.min(rect.left, window.innerWidth - calW - 8))
   calPosition.value = { top: rect.bottom + 4, left }
+  // 先移除旧监听器再注册，防止重复注册导致泄漏
+  document.removeEventListener("mousedown", handleCalClickOutside)
   document.addEventListener("mousedown", handleCalClickOutside)
 }
 

@@ -414,8 +414,13 @@ onMounted(async () => {
   document.addEventListener("click", closeContextMenu)
   document.addEventListener("keydown", handleTabBlock)
 
+  let rafPendingId: number | null = null
   resizeObserver = new ResizeObserver(() => {
-    updateConnections()
+    if (rafPendingId !== null) return
+    rafPendingId = requestAnimationFrame(() => {
+      rafPendingId = null
+      updateConnections()
+    })
   })
   const observe = (el: Element | null) => el && resizeObserver?.observe(el)
   observe(flowColumnRef.value)
