@@ -413,6 +413,44 @@ pub fn run() {
             get_window_size,
         ])
         .setup(|app| {
+            // ── 从保存的设置中恢复窗口尺寸，再显示窗口 ──
+            if let Some(main_window) = app.get_webview_window("main") {
+                let settings_path = get_base_dir().ok().map(|b| b.join("data/settings.json"));
+                if let Some(path) = settings_path {
+                    if let Ok(content) = std::fs::read_to_string(&path) {
+                        if let Ok(settings) = serde_json::from_str::<serde_json::Value>(&content) {
+                            let ws = settings.get("windowSize").and_then(|v| v.as_str());
+                            IS_PROGRAMMATIC_RESIZE.store(true, Ordering::SeqCst);
+                            match ws {
+                                Some("custom") => {
+                                    let w = settings.get("customWindowWidth").and_then(|v| v.as_f64());
+                                    let h = settings.get("customWindowHeight").and_then(|v| v.as_f64());
+                                    if let (Some(w), Some(h)) = (w, h) {
+                                        let _ = main_window.set_size(tauri::LogicalSize::new(w, h));
+                                        let _ = main_window.center();
+                                    }
+                                }
+                                Some("maximized") => {
+                                    let _ = main_window.maximize();
+                                }
+                                Some("small") => {
+                                    let _ = main_window.set_size(tauri::LogicalSize::new(1000.0, 650.0));
+                                    let _ = main_window.center();
+                                }
+                                Some("large") => {
+                                    let _ = main_window.set_size(tauri::LogicalSize::new(1400.0, 900.0));
+                                    let _ = main_window.center();
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+                }
+                // 尺寸已设置完毕，现在显示窗口（隐藏 → 直接呈现最终尺寸）
+                let _ = main_window.show();
+                let _ = main_window.set_focus();
+            }
+
             if cfg!(debug_assertions) {
                 app.handle().plugin(
                     tauri_plugin_log::Builder::default()
