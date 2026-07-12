@@ -481,8 +481,8 @@ export async function activateNode(stepIdx: number, nodeIdx: number) {
   await createItemForNode(node, project.id)
 }
 
-export async function completeNodeAndAdvance(stepIdx: number, nodeIdx: number) {
-  const project = selectedProject.value
+export async function completeNodeAndAdvance(stepIdx: number, nodeIdx: number, projectId?: number) {
+  const project = projectId ? state.projects.find(p => p.id === projectId) : selectedProject.value
   if (!project) return
   const step = project.steps[stepIdx]
   if (!step) return

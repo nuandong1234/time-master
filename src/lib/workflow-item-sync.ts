@@ -41,7 +41,7 @@ export async function completeItem(id: number) {
         const step = project.steps[si]
         for (let ni = 0; ni < step.nodes.length; ni++) {
           if (step.nodes[ni].id === workflowRef.nodeId && step.nodes[ni].status !== "done") {
-            await completeNodeAndAdvance(si, ni)
+            await completeNodeAndAdvance(si, ni, workflowRef.projectId)
             return true
           }
         }
@@ -130,17 +130,21 @@ export async function clearDoneItems() {
  * 规则 5：工作流节点完成 → 把关联事项标为完成
  * 规则 6：节点完成 → 同步更新事项日期/名称
  */
-export async function completeNodeAndAdvance(stepIdx: number, nodeIdx: number) {
-  // 获取当前节点的关联事项 ID
-  const steps = wfState.selectedProjectSteps?.value
-  const step = steps?.[stepIdx]
-  const currentNode = step?.nodes?.[nodeIdx]
-  const linkedItemId = currentNode?.itemId
+export async function completeNodeAndAdvance(stepIdx: number, nodeIdx: number, projectId?: number) {
+  // 获取关联事项 ID：有 projectId 时从对应项目取，否则从当前选中项目取
+  let linkedItemId: number | undefined
+  if (projectId !== undefined) {
+    const project = getProjectById(projectId)
+    const step = project?.steps?.[stepIdx]
+    linkedItemId = step?.nodes?.[nodeIdx]?.itemId
+  } else {
+    const steps = wfState.selectedProjectSteps?.value
+    const step = steps?.[stepIdx]
+    linkedItemId = step?.nodes?.[nodeIdx]?.itemId
+  }
 
-  // 调用纯工作流逻辑（标记完成、推进、保存）
-  await wfCompleteNodeAndAdvance(stepIdx, nodeIdx)
+  await wfCompleteNodeAndAdvance(stepIdx, nodeIdx, projectId)
 
-  // 标记关联事项为完成
   if (linkedItemId) {
     await markItemAsDone(linkedItemId)
   }

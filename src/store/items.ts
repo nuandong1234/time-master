@@ -42,7 +42,8 @@ export async function loadItems(force = false, preloadedData?: any) {
   if (state.loaded && !force) return
   const data = preloadedData
   if (data) {
-    state.items = data.items || []
+    // 使用 splice 原地替换数组内容，保持引用一致性（与 workflow.ts assignState 做法一致）
+    state.items.splice(0, state.items.length, ...(data.items || []))
     state.nextId = data.nextId || 1
   }
   state.loaded = true
