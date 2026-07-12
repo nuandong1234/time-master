@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "时间管理工具",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "identifier": "com.timemaster.app",
   "build": {
     "frontendDist": "../dist",
@@ -29,7 +29,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis"],
+    "targets": "nsis",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
