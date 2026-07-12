@@ -12,7 +12,9 @@
       "Bash(npx tauri *)",
       "Bash(cargo clippy *)",
       "Skill(run)",
-      "Bash(cmd //c \"where node\" 2>&1)"
+      "Bash(cmd //c \"where node\" 2>&1)",
+      "Read(//g/time-master/**)",
+      "Bash(node -e ' *)"
     ]
   }
 }
