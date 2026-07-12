@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:codebuddy.wendell.com)",
+      "Bash(curl -sL \"https://marketplace.visualstudio.com/items?itemName=CodeBuddy.codebuddy-vscode\")",
+      "Bash(curl -sL \"https://codebuddy.wendell.com\")",
+      "Bash(npx vite *)",
+      "Bash(npx vue-tsc *)",
+      "Bash(npm install *)",
+      "Bash(cargo check *)",
+      "Bash(npx tauri *)",
+      "Bash(cargo clippy *)",
+      "Skill(run)",
+      "Bash(cmd //c \"where node\" 2>&1)"
+    ]
+  }
+}
