@@ -7,7 +7,6 @@ import { useCalendar } from "@/composables/useCalendar"
 import { getProjectById, saveWorkflow } from "@/store/workflow"
 import { now } from "@/lib/datetime"
 import CommentSection from "./CommentSection.vue"
-import type { Comment } from "./CommentSection.vue"
 
 onUnmounted(() => {
   document.removeEventListener("mousedown", handleCalClickOutside)
@@ -185,12 +184,14 @@ function handleDelete() {
 }
 
 /** 评论数据：关联项目时从节点 activityLog 读，否则从 item.comments 读 */
-const commentList = computed<Comment[]>(() => {
-  if (!props.item) return []
+const commentList = computed(() => {
+  const item = props.item
+  if (!item) return []
   // 关联项目 → 从节点 activityLog 取评论
-  if (props.item.workflowRef) {
-    const project = getProjectById(props.item.workflowRef.projectId)
-    const node = project?.steps.flatMap(s => s.nodes).find(n => n.id === props.item.workflowRef!.nodeId)
+  const wf = item.workflowRef
+  if (wf) {
+    const project = getProjectById(wf.projectId)
+    const node = project?.steps.flatMap(s => s.nodes).find(n => n.id === wf.nodeId)
     if (!node?.activityLog) return []
     return node.activityLog
       .filter(e => e.type === "comment")
@@ -203,8 +204,8 @@ const commentList = computed<Comment[]>(() => {
       }))
   }
   // 未关联项目 → 从 item.comments 取
-  if (!props.item.comments) return []
-  return props.item.comments.map(c => ({
+  if (!item.comments) return []
+  return item.comments.map(c => ({
     id: c.id,
     author: c.author,
     content: c.content,
@@ -214,11 +215,13 @@ const commentList = computed<Comment[]>(() => {
 })
 
 function handleCommentSubmit(content: string, images?: string[]) {
-  if (!props.item) return
+  const item = props.item
+  if (!item) return
   // 关联项目 → 写到节点 activityLog
-  if (props.item.workflowRef) {
-    const project = getProjectById(props.item.workflowRef.projectId)
-    const node = project?.steps.flatMap(s => s.nodes).find(n => n.id === props.item.workflowRef!.nodeId)
+  const wf = item.workflowRef
+  if (wf) {
+    const project = getProjectById(wf.projectId)
+    const node = project?.steps.flatMap(s => s.nodes).find(n => n.id === wf.nodeId)
     if (!node) return
     if (!node.activityLog) node.activityLog = []
     node.activityLog.push({
@@ -233,7 +236,7 @@ function handleCommentSubmit(content: string, images?: string[]) {
     return
   }
   // 未关联项目 → 原样 emit 给父组件
-  emit("comment", { itemId: props.item.id, content, images })
+  emit("comment", { itemId: item.id, content, images })
 }
 </script>
 
