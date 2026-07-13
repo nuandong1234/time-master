@@ -2,7 +2,6 @@
 
 一款集 **番茄钟**、**四象限任务管理** 与 **看板工作流** 于一体的 Windows 桌面效率工具。基于 Tauri 2 + Vue 3 + TypeScript 构建。
 
-- 产品名：时间管理工具 · 版本：v0.2.2 · 标识符：`com.timemaster.app`
 - 分发方式：Windows NSIS 安装包 · 界面语言：简体中文
 
 三个模块通过共享的「事项 id」相互联动：**事项 ↔ 番茄钟 ↔ 工作流**，一处完成，处处推进。
@@ -118,10 +117,3 @@ docs/                    设计文档 (ADR、领域词汇、AI Agent 上下文)
 
 ---
 
-## 开发约定
-
-- 组合式 API + `<script setup>`；状态用模块级 `reactive` / `computed` 单例
-- 组件名 PascalCase，文件名 camelCase
-- TypeScript 严格模式，界面仅简体中文（暂无 i18n）
-
-> 更多领域术语与架构说明见 `CONTEXT.md` 与 `docs/`。
