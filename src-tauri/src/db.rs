@@ -316,13 +316,15 @@ fn load_workflow_json(conn: &Connection) -> Result<serde_json::Value, String> {
 
     let activities: Vec<(i64, serde_json::Value)> = act_stmt.query_map([], |row| {
         let node_id: i64 = row.get(1)?;
+        let images_str: String = row.get::<_, String>(6).unwrap_or_default();
+        let images_val: serde_json::Value = serde_json::from_str(&images_str).unwrap_or(serde_json::Value::Array(vec![]));
         Ok((node_id, serde_json::json!({
             "id": row.get::<_, i64>(0).unwrap_or(0),
             "type": row.get::<_, String>(2).unwrap_or_default(),
             "author": row.get::<_, String>(3).unwrap_or_default(),
             "content": row.get::<_, String>(4).unwrap_or_default(),
             "timestamp": row.get::<_, String>(5).unwrap_or_default(),
-            "images": row.get::<_, String>(6).unwrap_or_default()
+            "images": images_val
         })))
     }).map_err(|e| e.to_string())?.filter_map(|r| r.ok()).collect();
 
