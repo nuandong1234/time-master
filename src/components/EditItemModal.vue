@@ -184,7 +184,7 @@ watch(() => props.modelValue, (val) => {
       startDate: props.item.startDate,
       endDate: props.item.endDate,
       priority: props.item.priority,
-      repeatType: props.item.repeatType || "none",
+      repeatType: props.item.workflowRef ? "none" : (props.item.repeatType || "none"),
     }
     showCal.value = false
     calMode.value = "start"
@@ -259,7 +259,7 @@ watch(() => props.modelValue, (val) => {
                 @click="day !== null && !(calMode === 'end' && form.startDate && isBeforeStart(calYear, calMonth, day, form.startDate)) && selectDay(day)"
               >{{ day }}</span>
             </div>
-            <div class="mt-3 pt-3 border-t border-border flex items-center gap-2 text-xs">
+            <div v-if="!item?.workflowRef" class="mt-3 pt-3 border-t border-border flex items-center gap-2 text-xs">
               <span class="text-muted-foreground shrink-0">重复：</span>
               <button v-for="opt in repeatOptions" :key="opt.value"
                 class="px-2 py-0.5 rounded transition-colors"

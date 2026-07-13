@@ -4,6 +4,8 @@ import type { Item } from "@/store/items"
 import { showToast } from "@/store/toast"
 import { isOverdue, getWorkflowProjectName } from "@/lib/item-utils"
 import { useCalendar } from "@/composables/useCalendar"
+import { getProjectById, saveWorkflow } from "@/store/workflow"
+import { now } from "@/lib/datetime"
 import CommentSection from "./CommentSection.vue"
 import type { Comment } from "./CommentSection.vue"
 
@@ -154,7 +156,7 @@ watch(() => props.item, (val) => {
       startDate: val.startDate,
       endDate: val.endDate,
       priority: val.priority,
-      repeatType: val.repeatType || "none",
+      repeatType: val.workflowRef ? "none" : (val.repeatType || "none"),
     }
     showCal.value = false
   }
@@ -182,9 +184,26 @@ function handleDelete() {
   }
 }
 
-/** 评论数据：从 item.comments 归一化 */
+/** 评论数据：关联项目时从节点 activityLog 读，否则从 item.comments 读 */
 const commentList = computed<Comment[]>(() => {
-  if (!props.item?.comments) return []
+  if (!props.item) return []
+  // 关联项目 → 从节点 activityLog 取评论
+  if (props.item.workflowRef) {
+    const project = getProjectById(props.item.workflowRef.projectId)
+    const node = project?.steps.flatMap(s => s.nodes).find(n => n.id === props.item.workflowRef!.nodeId)
+    if (!node?.activityLog) return []
+    return node.activityLog
+      .filter(e => e.type === "comment")
+      .map(c => ({
+        id: c.id,
+        author: c.author || "我",
+        content: c.content,
+        timestamp: c.timestamp,
+        images: c.images,
+      }))
+  }
+  // 未关联项目 → 从 item.comments 取
+  if (!props.item.comments) return []
   return props.item.comments.map(c => ({
     id: c.id,
     author: c.author,
@@ -196,6 +215,24 @@ const commentList = computed<Comment[]>(() => {
 
 function handleCommentSubmit(content: string, images?: string[]) {
   if (!props.item) return
+  // 关联项目 → 写到节点 activityLog
+  if (props.item.workflowRef) {
+    const project = getProjectById(props.item.workflowRef.projectId)
+    const node = project?.steps.flatMap(s => s.nodes).find(n => n.id === props.item.workflowRef!.nodeId)
+    if (!node) return
+    if (!node.activityLog) node.activityLog = []
+    node.activityLog.push({
+      id: Date.now(),
+      type: "comment",
+      author: "我",
+      content,
+      timestamp: now(),
+      ...(images && images.length > 0 ? { images } : {}),
+    })
+    saveWorkflow()
+    return
+  }
+  // 未关联项目 → 原样 emit 给父组件
   emit("comment", { itemId: props.item.id, content, images })
 }
 </script>
@@ -317,7 +354,7 @@ function handleCommentSubmit(content: string, images?: string[]) {
                 @click="day !== null && !(calMode === 'end' && form.startDate && isBeforeStart(calYear, calMonth, day, form.startDate)) && selectDay(day)"
               >{{ day }}</span>
             </div>
-            <div class="mt-3 pt-3 border-t border-border flex items-center gap-2 text-xs">
+            <div v-if="!item?.workflowRef" class="mt-3 pt-3 border-t border-border flex items-center gap-2 text-xs">
               <span class="text-muted-foreground shrink-0">重复：</span>
               <button
                 v-for="opt in repeatOptions" :key="opt.value"

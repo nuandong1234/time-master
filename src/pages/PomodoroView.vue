@@ -12,11 +12,12 @@ import { completeItem, updateItem, deleteItem } from "@/lib/workflow-item-sync"
 
 const { todoItems, syncedItems, todayCompletedItems, addItem, syncItem, resetExpiredSynced, loadItems } = useItems()
 
-const { pomodoroCompleted, totalFocusSeconds, lockedItemId } = usePomodoroStore()
+const { pomodoroCompleted, totalFocusSeconds, lockedItemId, resetPomodoroIfNewDay } = usePomodoroStore()
 
 onMounted(async () => {
   await loadItems()
   await resetExpiredSynced()
+  await resetPomodoroIfNewDay()
   document.addEventListener("keydown", handleTabBlock)
 })
 
@@ -166,7 +167,7 @@ const sortedSyncedItems = computed(() => {
                 <div class="text-sm flex items-center gap-1.5 flex-wrap" :class="isOverdue(item.endDate) ? 'text-red-500' : 'text-card-foreground'">
                   <span class="cursor-pointer text-sm" @click="handleSync(item.id)">⬜</span>
                   <span class="text-base">{{ item.name }}</span>
-                  <span v-if="item.workflowRef" class="shrink-0 text-[11px] text-muted-foreground" :title="'来自流程：' + getWorkflowProjectName(item.workflowRef.projectId)">🔗</span>
+                  <span v-if="item.workflowRef" class="shrink-0 text-[11px] text-muted-foreground" :title="'来自项目：' + getWorkflowProjectName(item.workflowRef.projectId)">🔗</span>
                   <span class="text-sm text-white rounded-full px-2 py-px" :class="priorityColors[item.priority]">{{ priorityLabels[item.priority] }}</span>
                 </div>
                 <div class="text-sm text-muted-foreground mt-1 flex items-center gap-0.5">
@@ -202,7 +203,7 @@ const sortedSyncedItems = computed(() => {
                 <div class="text-sm flex items-center gap-1.5 flex-wrap" :class="isOverdue(item.endDate) ? 'text-red-500' : 'text-card-foreground'">
                   <span class="cursor-pointer text-sm" @click.stop="handleComplete(item.id)">⬜</span>
                   <span class="text-base">{{ item.name }}</span>
-                  <span v-if="item.workflowRef" class="shrink-0 text-[11px] text-muted-foreground" :title="'来自流程：' + getWorkflowProjectName(item.workflowRef.projectId)">🔗</span>
+                  <span v-if="item.workflowRef" class="shrink-0 text-[11px] text-muted-foreground" :title="'来自项目：' + getWorkflowProjectName(item.workflowRef.projectId)">🔗</span>
                   <span class="text-sm text-white rounded-full px-2 py-px" :class="priorityColors[item.priority]">{{ priorityLabels[item.priority] }}</span>
                   <button v-if="linkedItem?.id === item.id && !lockedItem" class="ml-auto text-sm text-white bg-blue-400 hover:bg-blue-500 rounded-md px-4 py-1.5" @click.stop="startPomodoro">开始</button>
                   <button v-if="lockedItem?.id === item.id" class="ml-auto text-sm text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30 rounded-md px-4 py-1.5 cursor-default">进行中</button>
