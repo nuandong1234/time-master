@@ -12,7 +12,7 @@
 - **艾森豪威尔四象限** —— 按「重要 × 紧急」对任务做优先级分类。
 - **看板式工作流 (Kanban workflow)** —— 多步骤的项目管理。
 
-技术栈为 **Tauri 2 + Vue 3 + TypeScript**。包名 `com.timemaster.app`,以 Windows NSIS 安装包分发。
+技术栈为 **Tauri 2 + Vue 3 + TypeScript + SQLite**。包名 `com.timemaster.app`,以 Windows NSIS 安装包分发。
 界面语言为简体中文,暂无国际化(i18n)层。
 
 ## 领域术语表
@@ -24,7 +24,7 @@
 - **今日统计 (daily stats)** —— 当天完成的番茄数与累计专注时长。
 - **自动循环 (auto-loop)** —— 一轮结束后自动进入休息,再自动进入下一轮。
 ### 📋 事项清单 (Collaborate / Items)
-- **事项 (item / task)** —— 待办清单的最小单元。存放在 `data/items.json`。
+- **事项 (item / task)** —— 待办清单的最小单元。存放在 SQLite 的 `items` 表。
 - **四象限 (four quadrants)** —— 按 重要 (important) × 紧急 (urgent) 分类:
   - 重要且紧急 / 重要不紧急 / 不重要紧急 / 不重要不紧急。
 - **看板模式 (Board) / 列表模式 (List)** —— 事项的两种视图。
@@ -50,21 +50,36 @@
 
 ## 架构上下文
 
-- **无后端 / 无数据库。** 所有用户数据都是本地 JSON 文件,经 Tauri IPC 读写。
-  详见 `docs/adr/0001-local-json-storage.md`。
+- **本地 SQLite 数据库。** 所有用户数据存储在 `data/timemaster.db`，通过 `rusqlite` 读写。
+  从旧版 JSON 文件迁移由 `db::migrate_from_json()` 自动完成。
 - **状态管理** 采用 `src/store/` 下的模块级 Vue `reactive`/`computed` 单例 —— 不用 Pinia。
   详见 `docs/adr/0002-module-singleton-state.md`。
 - **双窗口**:主窗口 + 一个居中于主窗口的单例设置窗口。
   详见 `docs/adr/0003-single-instance-dual-window.md`。
 - **单实例** 应用(防止多开),并带有**系统托盘**(最小化到托盘)。
 - **数据位置**:调试模式 → `%TEMP%/time-master-data/`;生产模式 → 可执行文件同级目录。
-  文件:`items.json`、`pomodoro.json`、`workflow.json`、`settings.json`。
+  文件: `data/timemaster.db`（SQLite 数据库）、`data/app.log`（日志文件，详见下方日志系统）。
 
 ## 数据流形态
 
 ```
 Vue 组件 (UI)  ⇅  Store (响应式状态)  ⇠  composables (业务逻辑)
        ⇅  data-store.ts (IPC 封装)
-       ⇅  Rust 后端 (src-tauri/src/lib.rs)  ⇠  fs 读写
-       ⇅  磁盘上的 JSON 文件
+       ⇅  Rust 后端 (src-tauri/src/lib.rs)  ⇠  rusqlite
+       ⇅  SQLite 文件 (data/timemaster.db)
 ```
+
+## 日志系统
+
+详见 `docs/adr/0004-logging-system.md`（待创建）。
+
+### 概要
+- **日志文件**: `data/app.log`，与 SQLite 数据库同目录。
+- **轮转**: 单文件最大 5MB，保留最近 3 个归档文件（`app_2026-07-13_*.log`）。
+- **默认级别**:
+  - Debug 构建: `DEBUG`
+  - Release 构建: `WARN` + 关键 `INFO`
+- **调试开关**: 设置页「调试」区域可开启调试日志，级别升至 `DEBUG`，24 小时后自动关闭。
+- **前端日志**: `console.error()` / `console.warn()` 自动通过 IPC 转发到 Rust 日志文件。
+- **边界规则**: 用户业务操作（重命名、状态变更、评论）归 `workflow_node_activity` 表；
+  系统操作（命令调用、数据库读写、文件 I/O）归 `app.log`，不重复记录。

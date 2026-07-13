@@ -5,16 +5,25 @@ use serde_json::Value;
 // ── 数据库初始化 ──
 
 pub fn init_db(db_path: &str) -> Result<Connection, String> {
-    let conn = Connection::open(db_path).map_err(|e| e.to_string())?;
+    log::info!("[DB] init_db  path=\"{}\"", db_path);
+    let conn = Connection::open(db_path).map_err(|e| {
+        log::error!("[DB] 打开数据库失败: {}", e);
+        e.to_string()
+    })?;
 
-    // 开启外键约束
-    conn.execute_batch("PRAGMA foreign_keys = ON;").map_err(|e| e.to_string())?;
-    // WAL 模式：提升并发读写性能
-    conn.execute_batch("PRAGMA journal_mode = WAL;").map_err(|e| e.to_string())?;
+    conn.execute_batch("PRAGMA foreign_keys = ON;").map_err(|e| {
+        log::error!("[DB] 启用外键约束失败: {}", e);
+        e.to_string()
+    })?;
+    conn.execute_batch("PRAGMA journal_mode = WAL;").map_err(|e| {
+        log::error!("[DB] 启用 WAL 模式失败: {}", e);
+        e.to_string()
+    })?;
 
     create_tables(&conn)?;
     // 迁移：为 item_comments 添加 images 列（兼容旧数据库）
     let _ = conn.execute_batch("ALTER TABLE item_comments ADD COLUMN images TEXT NOT NULL DEFAULT '[]';");
+    log::info!("[DB] 数据库初始化完成");
     Ok(conn)
 }
 
@@ -120,10 +129,19 @@ fn create_tables(conn: &Connection) -> Result<(), String> {
 // ── 全量数据加载 ──
 
 pub fn load_all_data(conn: &Connection) -> Result<serde_json::Value, String> {
+    log::debug!("[DB] load_all_data");
     let items = load_items_json(conn)?;
     let workflow = load_workflow_json(conn)?;
     let settings = load_settings_json(conn)?;
     let pomodoro = load_pomodoro_json(conn)?;
+
+    log::info!(
+        "[DB] 数据加载完成  items={}  categories={}  projects={}  settings_keys={}",
+        items.get("items").and_then(|v| v.as_array()).map(|a| a.len()).unwrap_or(0),
+        workflow.get("categories").and_then(|v| v.as_array()).map(|a| a.len()).unwrap_or(0),
+        workflow.get("projects").and_then(|v| v.as_array()).map(|a| a.len()).unwrap_or(0),
+        settings.as_object().map(|o| o.len()).unwrap_or(0),
+    );
 
     let mut map = serde_json::Map::new();
     map.insert("items".to_string(), items);
@@ -459,9 +477,16 @@ fn load_pomodoro_json(conn: &Connection) -> Result<serde_json::Value, String> {
 // ── 保存各数据模块 ──
 
 pub fn save_items(conn: &Connection, json_str: &str) -> Result<(), String> {
-    let data: serde_json::Value = serde_json::from_str(json_str).map_err(|e| e.to_string())?;
+    log::debug!("[DB] save_items");
+    let data: serde_json::Value = serde_json::from_str(json_str).map_err(|e| {
+        log::error!("[DB] save_items JSON 解析失败: {}", e);
+        e.to_string()
+    })?;
 
-    let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+    let tx = conn.unchecked_transaction().map_err(|e| {
+        log::error!("[DB] save_items 事务启动失败: {}", e);
+        e.to_string()
+    })?;
 
     // 清空原有数据
     tx.execute("DELETE FROM item_comments", []).map_err(|e| e.to_string())?;
@@ -531,13 +556,25 @@ pub fn save_items(conn: &Connection, json_str: &str) -> Result<(), String> {
         }
     }
 
-    tx.commit().map_err(|e| e.to_string())
+    tx.commit().map_err(|e| {
+        log::error!("[DB] save_items 事务提交失败: {}", e);
+        e.to_string()
+    })?;
+    log::debug!("[DB] save_items 完成");
+    Ok(())
 }
 
 pub fn save_workflow(conn: &Connection, json_str: &str) -> Result<(), String> {
-    let data: serde_json::Value = serde_json::from_str(json_str).map_err(|e| e.to_string())?;
+    log::debug!("[DB] save_workflow");
+    let data: serde_json::Value = serde_json::from_str(json_str).map_err(|e| {
+        log::error!("[DB] save_workflow JSON 解析失败: {}", e);
+        e.to_string()
+    })?;
 
-    let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+    let tx = conn.unchecked_transaction().map_err(|e| {
+        log::error!("[DB] save_workflow 事务启动失败: {}", e);
+        e.to_string()
+    })?;
 
     // 清空原有数据（按外键顺序，先删子表）
     tx.execute("DELETE FROM workflow_node_activity", []).map_err(|e| e.to_string())?;
@@ -648,13 +685,22 @@ pub fn save_workflow(conn: &Connection, json_str: &str) -> Result<(), String> {
         }
     }
 
-    tx.commit().map_err(|e| e.to_string())
+    tx.commit().map_err(|e| e.to_string())?;
+    log::debug!("[DB] save_workflow 完成");
+    Ok(())
 }
 
 pub fn save_settings(conn: &Connection, json_str: &str) -> Result<(), String> {
-    let data: serde_json::Value = serde_json::from_str(json_str).map_err(|e| e.to_string())?;
+    log::debug!("[DB] save_settings");
+    let data: serde_json::Value = serde_json::from_str(json_str).map_err(|e| {
+        log::error!("[DB] save_settings JSON 解析失败: {}", e);
+        e.to_string()
+    })?;
 
-    let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+    let tx = conn.unchecked_transaction().map_err(|e| {
+        log::error!("[DB] save_settings 事务启动失败: {}", e);
+        e.to_string()
+    })?;
     tx.execute("DELETE FROM settings", []).map_err(|e| e.to_string())?;
 
     if let Some(obj) = data.as_object() {
@@ -671,11 +717,17 @@ pub fn save_settings(conn: &Connection, json_str: &str) -> Result<(), String> {
         }
     }
 
-    tx.commit().map_err(|e| e.to_string())
+    tx.commit().map_err(|e| e.to_string())?;
+    log::debug!("[DB] save_settings 完成");
+    Ok(())
 }
 
 pub fn save_pomodoro(conn: &Connection, json_str: &str) -> Result<(), String> {
-    let data: serde_json::Value = serde_json::from_str(json_str).map_err(|e| e.to_string())?;
+    log::debug!("[DB] save_pomodoro");
+    let data: serde_json::Value = serde_json::from_str(json_str).map_err(|e| {
+        log::error!("[DB] save_pomodoro JSON 解析失败: {}", e);
+        e.to_string()
+    })?;
 
     conn.execute(
         "INSERT OR REPLACE INTO pomodoro (id, pomodoro_completed, pomodoro_date,
@@ -690,14 +742,19 @@ pub fn save_pomodoro(conn: &Connection, json_str: &str) -> Result<(), String> {
             data.get("breakMinutes").and_then(|v| v.as_i64()).unwrap_or(5),
             data.get("totalRounds").and_then(|v| v.as_i64()).unwrap_or(4),
         ]
-    ).map_err(|e| e.to_string())?;
+    ).map_err(|e| {
+        log::error!("[DB] save_pomodoro 写入失败: {}", e);
+        e.to_string()
+    })?;
 
+    log::debug!("[DB] save_pomodoro 完成");
     Ok(())
 }
 
 // ── 重置、导入、导出 ──
 
 pub fn reset_all(conn: &Connection) -> Result<(), String> {
+    log::warn!("[DB] reset_all — 清空所有数据");
     let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
     tx.execute("DELETE FROM workflow_node_activity", []).map_err(|e| e.to_string())?;
     tx.execute("DELETE FROM workflow_nodes", []).map_err(|e| e.to_string())?;
@@ -1038,6 +1095,7 @@ pub fn migrate_from_json(conn: &Connection, base_dir: &Path) -> Result<bool, Str
         let count: i64 = conn.query_row("SELECT COUNT(*) FROM items", [], |row| row.get(0))
             .unwrap_or(0);
         if count > 0 {
+            log::info!("[DB] 迁移跳过: 数据库已有 {} 条 items", count);
             return Ok(false); // 已有数据，不需要迁移
         }
     }
@@ -1055,19 +1113,25 @@ pub fn migrate_from_json(conn: &Connection, base_dir: &Path) -> Result<bool, Str
     for (file_name, section) in &files {
         let file_path = data_dir.join(file_name);
         if !file_path.exists() {
+            log::debug!("[DB] 迁移: {} 不存在，跳过", file_name);
             continue;
         }
 
         let content = match std::fs::read_to_string(&file_path) {
             Ok(c) => c,
-            Err(_) => continue,
+            Err(_) => {
+                log::warn!("[DB] 迁移: 无法读取 {}", file_name);
+                continue;
+            }
         };
 
         if content.trim().is_empty() || content == "{}" {
+            log::debug!("[DB] 迁移: {} 为空，跳过", file_name);
             continue;
         }
 
         migrated = true;
+        log::info!("[DB] 迁移: 正在迁移 {}", file_name);
 
         match *section {
             "items" => {
@@ -1111,6 +1175,12 @@ pub fn migrate_from_json(conn: &Connection, base_dir: &Path) -> Result<bool, Str
             }
             _ => {}
         }
+    }
+
+    if migrated {
+        log::info!("[DB] 迁移完成");
+    } else {
+        log::debug!("[DB] 迁移: 无文件需要迁移");
     }
 
     Ok(migrated)

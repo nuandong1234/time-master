@@ -135,16 +135,22 @@ function assignState(data: any) {
 }
 
 export async function saveWorkflow() {
-  await dataStore.saveWorkflow({
-    categories: state.categories,
-    projects: state.projects,
-    nextCategoryId: state.nextCategoryId,
-    nextProjectId: state.nextProjectId,
-    nextStepId: state.nextStepId,
-    nextNodeId: state.nextNodeId,
-    selectedProjectId: state.selectedProjectId,
-    selectedStepIdx: state.selectedStepIdx,
-  })
+  try {
+    await dataStore.saveWorkflow({
+      categories: state.categories,
+      projects: state.projects,
+      nextCategoryId: state.nextCategoryId,
+      nextProjectId: state.nextProjectId,
+      nextStepId: state.nextStepId,
+      nextNodeId: state.nextNodeId,
+      selectedProjectId: state.selectedProjectId,
+      selectedStepIdx: state.selectedStepIdx,
+    })
+  } catch (e) {
+    console.error('[workflow] 保存工作流失败', e)
+    showToast('保存工作流失败: ' + String(e), 'error')
+    throw e
+  }
 }
 
 async function loadWorkflow(preloadedData?: any) {

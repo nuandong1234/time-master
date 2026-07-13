@@ -5,14 +5,14 @@ import { emit } from "@tauri-apps/api/event"
 import { save, open } from "@tauri-apps/plugin-dialog"
 import {
   loadSettings, setTheme, setMinimizeToTray, setWindowSize,
-  useSettings, applyTheme
+  useSettings, applyTheme, toggleDebugLogging
 } from "@/store/settings"
 import { showToast } from "@/store/toast"
 import { loadItems } from "@/store/items"
 import { loadPomodoroSettings } from "@/store/pomodoro"
 import { initWorkflow } from "@/store/workflow"
 
-const { theme, minimizeToTray, windowSize } = useSettings()
+const { theme, minimizeToTray, windowSize, debugLogging } = useSettings()
 
 const currentWindowPreset = ref(windowSize.value)
 
@@ -177,12 +177,12 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="h-full overflow-auto p-6 relative select-none">
+  <div class="h-screen overflow-auto p-6 relative select-none settings-scroll">
 
     <!-- ⚙️ 系统 -->
     <div class="mb-8">
       <h3 class="text-sm font-semibold text-foreground pb-2 mb-4 border-b border-border/50">
-        系统
+        ⚙️ 系统
       </h3>
       <div class="space-y-4">
         <div class="flex items-center justify-between">
@@ -257,7 +257,7 @@ onMounted(async () => {
     <!-- 💾 数据管理 -->
     <div class="mb-8">
       <h3 class="text-sm font-semibold text-foreground pb-2 mb-4 border-b border-border/50">
-        数据管理
+        💾 数据管理
       </h3>
       <div class="space-y-3">
         <div class="flex items-center justify-between">
@@ -285,6 +285,35 @@ onMounted(async () => {
               @click="openDataFolder"
             >打开</button>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 🛠 高级 -->
+    <div class="mb-8">
+      <h3 class="text-sm font-semibold text-foreground pb-2 mb-4 border-b border-border/50">
+        🛠 高级
+      </h3>
+      <div class="space-y-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <h4 class="text-sm font-medium text-foreground">调试日志</h4>
+            <p class="text-xs text-muted-foreground mt-0.5">
+              记录详细的运行日志，用于排查问题。开启后请在复现问题后，将
+              <code class="text-xs bg-muted px-1 rounded">data/app.log</code>
+              文件发送给开发者。开启 24 小时后自动关闭。
+            </p>
+          </div>
+          <button
+            class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0"
+            :class="debugLogging ? 'bg-primary' : 'bg-input'"
+            @click="toggleDebugLogging"
+          >
+            <span
+              class="inline-block size-5 rounded-full bg-white shadow-sm transition-transform"
+              :class="debugLogging ? 'translate-x-[22px]' : 'translate-x-[2px]'"
+            />
+          </button>
         </div>
 
         <div class="pt-1">
@@ -322,3 +351,16 @@ onMounted(async () => {
 
   </div>
 </template>
+
+<style>
+/* 隐藏所有滚动条，鼠标滚轮仍可滚动 */
+html, body, .settings-scroll {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+.settings-scroll::-webkit-scrollbar {
+  display: none;
+}
+</style>

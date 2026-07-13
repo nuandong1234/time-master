@@ -2,6 +2,7 @@ import { reactive, computed } from "vue"
 import { formatDateTime, formatDate } from "@/lib/datetime"
 import { dataStore } from "@/lib/data-store"
 import { lockedItemId } from "./pomodoro"
+import { showToast } from "./toast"
 
 export interface ItemComment {
   id: number
@@ -50,10 +51,16 @@ export async function loadItems(force = false, preloadedData?: any) {
 }
 
 async function saveItems() {
-  await dataStore.saveItems({
-    items: state.items,
-    nextId: state.nextId,
-  })
+  try {
+    await dataStore.saveItems({
+      items: state.items,
+      nextId: state.nextId,
+    })
+  } catch (e) {
+    console.error('[items] 保存事项失败', e)
+    showToast('保存事项失败: ' + String(e), 'error')
+    throw e
+  }
 }
 
 export async function addItem(data: { name: string; description: string; startDate: string; endDate: string; priority: string; repeatType?: string; workflowRef?: { projectId: number; nodeId: number }; synced?: boolean }) {

@@ -7,6 +7,7 @@ use tauri::{Manager, WebviewUrl};
 use tauri::Emitter;
 use tauri_plugin_notification::NotificationExt;
 use tauri_plugin_autostart::ManagerExt;
+use tauri_plugin_log::{Target, TargetKind, RotationStrategy, TimezoneStrategy};
 
 static MINIMIZE_TO_TRAY: AtomicBool = AtomicBool::new(true);
 static IS_PROGRAMMATIC_RESIZE: AtomicBool = AtomicBool::new(false);
@@ -44,88 +45,140 @@ fn get_or_init_conn<'a>(state: &'a tauri::State<'a, DbState>) -> std::sync::Mute
 
 #[tauri::command]
 fn init_database(state: tauri::State<DbState>) -> Result<serde_json::Value, String> {
+    log::info!("[CMD] init_database");
     let conn = get_or_init_conn(&state);
-    let all = db::load_all_data(&conn)?;
-    Ok(all)
+    let result = db::load_all_data(&conn);
+    match &result {
+        Ok(_v) => log::info!("[CMD] init_database → OK"),
+        Err(e) => log::error!("[CMD] init_database → {}", e),
+    }
+    result
 }
 
 #[tauri::command]
 fn save_items_data(state: tauri::State<DbState>, items_json: String) -> Result<(), String> {
+    let count = items_json.matches("\"id\"").count();
+    log::info!("[CMD] save_items_data  items_count={}", count);
     let conn = get_or_init_conn(&state);
-    db::save_items(&conn, &items_json)
+    let result = db::save_items(&conn, &items_json);
+    if let Err(ref e) = result {
+        log::error!("[CMD] save_items_data → {}", e);
+    }
+    result
 }
 
 #[tauri::command]
 fn save_workflow_data(state: tauri::State<DbState>, workflow_json: String) -> Result<(), String> {
+    let size = workflow_json.len();
+    log::info!("[CMD] save_workflow_data  size={}B", size);
     let conn = get_or_init_conn(&state);
-    db::save_workflow(&conn, &workflow_json)
+    let result = db::save_workflow(&conn, &workflow_json);
+    if let Err(ref e) = result {
+        log::error!("[CMD] save_workflow_data → {}", e);
+    }
+    result
 }
 
 #[tauri::command]
 fn save_settings_data(state: tauri::State<DbState>, settings_json: String) -> Result<(), String> {
+    log::info!("[CMD] save_settings_data");
     let conn = get_or_init_conn(&state);
-    db::save_settings(&conn, &settings_json)
+    let result = db::save_settings(&conn, &settings_json);
+    if let Err(ref e) = result {
+        log::error!("[CMD] save_settings_data → {}", e);
+    }
+    result
 }
 
 #[tauri::command]
 fn save_pomodoro_data(state: tauri::State<DbState>, pomodoro_json: String) -> Result<(), String> {
+    log::info!("[CMD] save_pomodoro_data");
     let conn = get_or_init_conn(&state);
-    db::save_pomodoro(&conn, &pomodoro_json)
+    let result = db::save_pomodoro(&conn, &pomodoro_json);
+    if let Err(ref e) = result {
+        log::error!("[CMD] save_pomodoro_data → {}", e);
+    }
+    result
 }
 
 #[tauri::command]
 fn get_data_dir() -> Result<String, String> {
     let dir = get_base_dir()?;
+    log::debug!("[CMD] get_data_dir → {}", dir.display());
     Ok(dir.to_string_lossy().to_string())
 }
 
 #[tauri::command]
 fn send_native_notification(app: tauri::AppHandle, title: String, body: String) -> Result<(), String> {
+    log::info!("[CMD] send_native_notification  title=\"{}\"", title);
     app.notification()
         .builder()
         .title(&title)
         .body(&body)
         .show()
-        .map_err(|e| e.to_string())
+        .map_err(|e| {
+            log::error!("[CMD] send_native_notification → {}", e);
+            e.to_string()
+        })
 }
 
 #[tauri::command]
 fn export_data(state: tauri::State<DbState>, path: String, format: String) -> Result<(), String> {
+    log::info!("[CMD] export_data  format={}  path=\"{}\"", format, path);
     let conn = get_or_init_conn(&state);
 
-    if format == "csv" {
+    let result = if format == "csv" {
         let csv = db::export_csv(&conn)?;
-        fs::write(&path, csv).map_err(|e| e.to_string())?;
+        fs::write(&path, csv).map_err(|e| e.to_string())
     } else {
         let json = db::export_json(&conn)?;
-        fs::write(&path, json).map_err(|e| e.to_string())?;
-    }
+        fs::write(&path, json).map_err(|e| e.to_string())
+    };
 
-    Ok(())
+    if let Err(ref e) = result {
+        log::error!("[CMD] export_data → {}", e);
+    }
+    result
 }
 
 #[tauri::command]
 fn import_data(state: tauri::State<DbState>, path: String) -> Result<(), String> {
-    let content = fs::read_to_string(&path).map_err(|e| format!("无法读取文件: {}", e))?;
+    log::info!("[CMD] import_data  path=\"{}\"", path);
+    let content = fs::read_to_string(&path).map_err(|e| {
+        log::error!("[CMD] import_data 无法读取文件: {}", e);
+        format!("无法读取文件: {}", e)
+    })?;
     let conn = get_or_init_conn(&state);
-    db::import_json(&conn, &content)
+    let result = db::import_json(&conn, &content);
+    if let Err(ref e) = result {
+        log::error!("[CMD] import_data → {}", e);
+    }
+    result
 }
 
 #[tauri::command]
 fn reset_all_data(state: tauri::State<DbState>) -> Result<(), String> {
+    log::warn!("[CMD] reset_all_data");
     let conn = get_or_init_conn(&state);
-    db::reset_all(&conn)
+    let result = db::reset_all(&conn);
+    if let Err(ref e) = result {
+        log::error!("[CMD] reset_all_data → {}", e);
+    }
+    result
 }
 
 #[tauri::command]
 fn get_autostart(app: tauri::AppHandle) -> Result<bool, String> {
-    app.autolaunch().is_enabled().map_err(|e| e.to_string())
+    let result = app.autolaunch().is_enabled().map_err(|e| e.to_string());
+    log::debug!("[CMD] get_autostart → {:?}", result);
+    result
 }
 
 #[tauri::command]
 fn open_data_folder() -> Result<(), String> {
     let base = get_base_dir()?;
     let path_str = base.to_string_lossy().to_string();
+    log::info!("[CMD] open_data_folder  path=\"{}\"", path_str);
     std::process::Command::new("explorer")
         .arg(&path_str)
         .spawn()
@@ -135,17 +188,22 @@ fn open_data_folder() -> Result<(), String> {
 
 #[tauri::command]
 fn set_autostart(app: tauri::AppHandle, enabled: bool) -> Result<(), String> {
+    log::info!("[CMD] set_autostart  enabled={}", enabled);
     let autostart = app.autolaunch();
-    if enabled {
-        autostart.enable().map_err(|e| e.to_string())?;
+    let result = if enabled {
+        autostart.enable().map_err(|e| e.to_string())
     } else {
-        autostart.disable().map_err(|e| e.to_string())?;
+        autostart.disable().map_err(|e| e.to_string())
+    };
+    if let Err(ref e) = result {
+        log::error!("[CMD] set_autostart → {}", e);
     }
-    Ok(())
+    result
 }
 
 #[tauri::command]
 fn open_settings_window(app: tauri::AppHandle) -> Result<(), String> {
+    log::info!("[CMD] open_settings_window");
     open_settings_window_impl(&app)
 }
 
@@ -193,7 +251,25 @@ fn set_minimize_to_tray(enabled: bool) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn set_debug_logging(enabled: bool) -> Result<(), String> {
+    if enabled {
+        log::set_max_level(log::LevelFilter::Debug);
+        log::info!("调试日志已开启");
+    } else {
+        let default = if cfg!(debug_assertions) {
+            log::LevelFilter::Debug
+        } else {
+            log::LevelFilter::Warn
+        };
+        log::set_max_level(default);
+        log::info!("调试日志已关闭");
+    }
+    Ok(())
+}
+
+#[tauri::command]
 async fn set_window_size(app: tauri::AppHandle, preset: String, width: Option<f64>, height: Option<f64>) -> Result<(), String> {
+    log::info!("[CMD] set_window_size  preset={}  {:?}x{:?}", preset, width, height);
     IS_PROGRAMMATIC_RESIZE.store(true, Ordering::SeqCst);
 
     let window = app.get_webview_window("main").ok_or("主窗口未找到")?;
@@ -237,7 +313,9 @@ async fn get_window_size(app: tauri::AppHandle) -> Result<(f64, f64, bool), Stri
     let physical_size = window.outer_size().map_err(|e| e.to_string())?;
     let scale = window.scale_factor().map_err(|e| e.to_string())?;
     let maximized = window.is_maximized().map_err(|e| e.to_string())?;
-    Ok((physical_size.width as f64 / scale, physical_size.height as f64 / scale, maximized))
+    let size = (physical_size.width as f64 / scale, physical_size.height as f64 / scale, maximized);
+    log::debug!("[CMD] get_window_size → {:?}", size);
+    Ok(size)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -264,6 +342,7 @@ pub fn run() {
             reset_all_data,
             set_autostart,
             set_minimize_to_tray,
+            set_debug_logging,
             open_settings_window,
             get_autostart,
             open_data_folder,
@@ -338,18 +417,65 @@ pub fn run() {
                 let _ = main_window.set_focus();
             }
 
+            // 读取 debugLogging 设置（在 conn 被管理前读取）
+            let dl_enabled: bool = conn.query_row(
+                "SELECT value FROM settings WHERE key = 'debugLogging'",
+                [],
+                |row| row.get::<_, String>(0),
+            )
+            .ok()
+            .map(|v| v == "true")
+            .unwrap_or(false);
+            let dl_started: String = conn.query_row(
+                "SELECT value FROM settings WHERE key = 'debugLoggingStartedAt'",
+                [],
+                |row| row.get::<_, String>(0),
+            )
+            .ok()
+            .unwrap_or_default();
+
             // 管理数据库连接（conn 被移动至此）
             app.manage(DbState {
                 conn: Mutex::new(conn),
             });
 
-            if cfg!(debug_assertions) {
-                app.handle().plugin(
-                    tauri_plugin_log::Builder::default()
-                        .level(log::LevelFilter::Info)
-                        .build(),
-                )?;
+            // ── 日志系统 ──
+            let data_dir = base.join("data");
+            std::fs::create_dir_all(&data_dir).map_err(|e| e.to_string())?;
+
+            app.handle().plugin(
+                tauri_plugin_log::Builder::default()
+                    .level(log::LevelFilter::Trace) // 由 log::set_max_level 控制实际级别
+                    .target(Target::new(TargetKind::Folder {
+                        path: data_dir,
+                        file_name: Some("app".into()),
+                    }))
+                    // 同时输出到 stdout（在终端中可见）
+                    .target(Target::new(TargetKind::Stdout))
+                    .max_file_size(5 * 1024 * 1024) // 5MB
+                    .rotation_strategy(RotationStrategy::KeepSome(3))
+                    .timezone_strategy(TimezoneStrategy::UseLocal)
+                    .build(),
+            )?;
+
+            // 设置初始日志级别
+            let initial_level = if cfg!(debug_assertions) {
+                log::LevelFilter::Debug
+            } else {
+                log::LevelFilter::Warn
+            };
+
+            if dl_enabled && !dl_started.is_empty() {
+                log::set_max_level(log::LevelFilter::Debug);
+            } else {
+                log::set_max_level(initial_level);
             }
+
+            log::info!(
+                "应用启动完成  数据目录: {}  日志级别: {}",
+                base.display(),
+                log::max_level()
+            );
 
             // ── 系统托盘 ──
             let show_item = MenuItemBuilder::with_id("show", "显示主窗口").build(app)?;
@@ -370,6 +496,7 @@ pub fn run() {
                 .menu(&menu)
                 .tooltip("时间管理")
                 .on_menu_event(|app, event| {
+                    log::info!("[TRAY] 菜单事件: {}", event.id.as_ref());
                     match event.id.as_ref() {
                         "show" => {
                             if let Some(window) = app.get_webview_window("main") {
@@ -381,6 +508,7 @@ pub fn run() {
                             let _ = open_settings_window_impl(app);
                         }
                         "quit" => {
+                            log::info!("[TRAY] 用户选择退出");
                             app.exit(0);
                         }
                         _ => {}
@@ -394,6 +522,7 @@ pub fn run() {
                     } = event
                     {
                         let app = tray.app_handle();
+                        log::debug!("[TRAY] 左键单击恢复窗口");
                         if let Some(window) = app.get_webview_window("main") {
                             let _ = window.show();
                             let _ = window.set_focus();
@@ -408,6 +537,7 @@ pub fn run() {
             match event {
                 tauri::WindowEvent::Resized(size) => {
                     if window.label() == "main" {
+                        log::debug!("[WINDOW] Resized  {}x{}", size.width, size.height);
                         if IS_PROGRAMMATIC_RESIZE.load(Ordering::SeqCst) {
                             IS_PROGRAMMATIC_RESIZE.store(false, Ordering::SeqCst);
                         } else {
@@ -427,9 +557,11 @@ pub fn run() {
                 tauri::WindowEvent::CloseRequested { api, .. } => {
                     if window.label() == "main" {
                         if MINIMIZE_TO_TRAY.load(Ordering::SeqCst) {
+                            log::info!("[WINDOW] 关闭请求 → 最小化到托盘");
                             api.prevent_close();
                             let _ = window.hide();
                         } else {
+                            log::info!("[WINDOW] 关闭请求 → 退出应用");
                             if let Some(settings) = window.app_handle().get_webview_window("settings") {
                                 let _ = settings.close();
                             }
