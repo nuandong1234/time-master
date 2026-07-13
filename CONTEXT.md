@@ -42,6 +42,17 @@
 - **自动推进 (auto-advance)** —— 节点绑定的「事项」完成时,该节点自动推进。
 - **一键激活 (one-click activate)** —— 点击节点会将其关联任务设为番茄钟的锁定任务。
 
+### ⚙️ 设置 (Settings)
+- **主题 (theme)** —— 界面配色方案，取值 `light` | `dark` | `system`。`system` 跟随 OS 偏好。
+- **最小化到托盘 (minimize to tray)** —— 关闭主窗口时的行为：隐藏到系统托盘（由 `MINIMIZE_TO_TRAY` 原子变量控制），还是直接退出应用。
+- **窗口尺寸预设 (window size preset)** —— 主窗口的几何尺寸规格，取值 `small`(1000×650) | `medium`(1200×800) | `large`(1400×900) | `maximized` | `custom`。`custom` 保存用户手动拖拽后的尺寸。
+- **自定义窗口尺寸 (custom window size)** —— 当预设为 `custom` 时，保存用户手动调整的宽度与高度。
+- **开机自启 (autostart)** —— 电脑启动时自动运行应用。由 `tauri-plugin-autostart` 委托 OS 管理，不经过 Settings DB。
+- **调试日志 (debug logging)** —— 将 Rust 后端日志级别从 `WARN` 提升到 `DEBUG`，24 小时后自动降回。日志文件位于 `data/app.log`。
+- **设置窗口 (settings window)** —— 独立于主窗口的单例 Webview 窗口，label 为 `"settings"`。从系统托盘菜单打开，居中于主窗口，不可调整大小。在该窗口中 SettingsView 单独渲染（不含 AppLayout 侧边栏）。
+- **数据管理** —— 三种操作：**导出**（将全部数据写入用户选择的 JSON/CSV 文件）、**导入**（从 JSON 文件恢复数据到 SQLite）、**恢复出厂设置**（清空所有 SQLite 表并重置 state 到默认值）。
+- **Settings DB** —— SQLite 的 `settings` 表，key-value 结构。保存 7 个键：`theme`, `minimizeToTray`, `windowSize`, `customWindowWidth`, `customWindowHeight`, `debugLogging`, `debugLoggingStartedAt`。每次保存会先 `DELETE` 全部再 `INSERT`。
+
 ## 跨模块同步(三向联动)
 
 三个模块并非彼此孤立,而是通过共享的「事项 id」相互同步:

@@ -297,6 +297,20 @@ function handleSelectProject(id: number) {
           class="text-[11px] px-2.5 py-0.5 rounded-full select-none"
           :class="projectStatusColor(projectStatusByNodes)"
         >● {{ runTimeDisplay }}</span>
+        <span class="ml-auto flex items-center gap-3 text-[11px] text-muted-foreground select-none">
+          <span class="flex items-center gap-1">
+            <kbd class="px-1.5 py-0.5 rounded bg-muted border border-border font-mono text-[10px]">Alt+A</kbd>
+            <span>添加节点</span>
+          </span>
+          <span class="flex items-center gap-1">
+            <kbd class="px-1.5 py-0.5 rounded bg-muted border border-border font-mono text-[10px]">Enter</kbd>
+            <span>添加步骤</span>
+          </span>
+          <span class="flex items-center gap-1">
+            <kbd class="px-1.5 py-0.5 rounded bg-muted border border-border font-mono text-[10px]">Delete</kbd>
+            <span>删除节点</span>
+          </span>
+        </span>
       </div>
 
       <div class="flex-1 flex min-h-0 overflow-hidden">

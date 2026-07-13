@@ -3,13 +3,13 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::menu::{MenuBuilder, MenuItemBuilder};
-use tauri::{Manager, WebviewUrl};
+use tauri::Manager;
 use tauri::Emitter;
 use tauri_plugin_notification::NotificationExt;
 use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_log::{Target, TargetKind, RotationStrategy, TimezoneStrategy};
 
-static MINIMIZE_TO_TRAY: AtomicBool = AtomicBool::new(true);
+static MINIMIZE_TO_TRAY: AtomicBool = AtomicBool::new(false);
 static IS_PROGRAMMATIC_RESIZE: AtomicBool = AtomicBool::new(false);
 
 mod db;
@@ -202,49 +202,6 @@ fn set_autostart(app: tauri::AppHandle, enabled: bool) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn open_settings_window(app: tauri::AppHandle) -> Result<(), String> {
-    log::info!("[CMD] open_settings_window");
-    open_settings_window_impl(&app)
-}
-
-fn open_settings_window_impl(app: &tauri::AppHandle) -> Result<(), String> {
-    // 单例：如果设置窗口已存在，激活它
-    if let Some(window) = app.get_webview_window("settings") {
-        let _ = window.show();
-        let _ = window.set_focus();
-        return Ok(());
-    }
-
-    // 计算主窗口居中位置
-    let (cx, cy) = if let Some(main) = app.get_webview_window("main") {
-        if let Ok(pos) = main.outer_position() {
-            if let Ok(size) = main.outer_size() {
-                let x = pos.x + (size.width as i32 - 640) / 2;
-                let y = pos.y + (size.height as i32 - 560) / 2;
-                (x.max(0), y.max(0))
-            } else { (0, 0) }
-        } else { (0, 0) }
-    } else { (0, 0) };
-
-    let builder = tauri::WebviewWindowBuilder::new(
-        app,
-        "settings",
-        WebviewUrl::App("#/settings".into()),
-    )
-    .title("设置")
-    .inner_size(640.0, 520.0)
-    .position(cx as f64, cy as f64)
-    .center()
-    .resizable(false)
-    .maximizable(false)
-    .decorations(true);
-
-    let _window = builder.build().map_err(|e| e.to_string())?;
-
-    Ok(())
-}
-
-#[tauri::command]
 fn set_minimize_to_tray(enabled: bool) -> Result<(), String> {
     MINIMIZE_TO_TRAY.store(enabled, Ordering::SeqCst);
     Ok(())
@@ -343,7 +300,6 @@ pub fn run() {
             set_autostart,
             set_minimize_to_tray,
             set_debug_logging,
-            open_settings_window,
             get_autostart,
             open_data_folder,
             set_window_size,
@@ -434,6 +390,17 @@ pub fn run() {
             .ok()
             .unwrap_or_default();
 
+            // 读取 minimizeToTray 设置，在窗口显示前初始化原子变量
+            let minimize_to_tray: bool = conn.query_row(
+                "SELECT value FROM settings WHERE key = 'minimizeToTray'",
+                [],
+                |row| row.get::<_, String>(0),
+            )
+            .ok()
+            .map(|v| v == "true")
+            .unwrap_or(false);
+            MINIMIZE_TO_TRAY.store(minimize_to_tray, Ordering::SeqCst);
+
             // 管理数据库连接（conn 被移动至此）
             app.manage(DbState {
                 conn: Mutex::new(conn),
@@ -479,11 +446,9 @@ pub fn run() {
 
             // ── 系统托盘 ──
             let show_item = MenuItemBuilder::with_id("show", "显示主窗口").build(app)?;
-            let settings_item = MenuItemBuilder::with_id("settings", "设置").build(app)?;
             let quit_item = MenuItemBuilder::with_id("quit", "退出应用").build(app)?;
             let menu = MenuBuilder::new(app)
                 .item(&show_item)
-                .item(&settings_item)
                 .item(&quit_item)
                 .build()?;
 
@@ -503,9 +468,6 @@ pub fn run() {
                                 let _ = window.show();
                                 let _ = window.set_focus();
                             }
-                        }
-                        "settings" => {
-                            let _ = open_settings_window_impl(app);
                         }
                         "quit" => {
                             log::info!("[TRAY] 用户选择退出");
