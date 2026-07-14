@@ -309,6 +309,51 @@ export async function deleteProject(id: number) {
   showToast('已删除项目', 'success')
 }
 
+export async function copyProject(id: number) {
+  const orig = state.projects.find(p => p.id === id)
+  if (!orig) return
+
+  // 深拷贝项目结构（纯数据，无函数）
+  const clone = JSON.parse(JSON.stringify(orig)) as WorkflowProject
+
+  // 生成新 ID
+  clone.id = state.nextProjectId++
+  clone.name = dedupName(orig.name, state.projects.map(p => p.name))
+
+  // 重置项目级状态
+  clone.status = "wait"
+  clone.completedAt = undefined
+  clone.activatedAt = undefined
+  clone.createdAt = now()
+
+  // 重置步骤和节点
+  for (const step of clone.steps) {
+    step.id = state.nextStepId++
+    for (const node of step.nodes) {
+      node.id = state.nextNodeId++
+      node.status = "wait"
+      node.itemId = undefined
+      node.activityLog = []
+      node.completedAt = undefined
+      node.startDate = undefined
+      node.endDate = undefined
+    }
+  }
+
+  // 加入同一目录末尾
+  const cat = state.categories.find(c => c.id === orig.categoryId)
+  if (cat) {
+    cat.projectIds.push(clone.id)
+  }
+
+  state.projects.push(clone)
+  state.selectedProjectId = clone.id
+  state.selectedStepIdx = 0
+
+  await saveWorkflow()
+  showToast('已复制项目', 'success')
+}
+
 export async function addProjectToCategory(catId: number) {
   if (catId === DONE_CATEGORY_ID) return
   const cat = state.categories.find(c => c.id === catId)
@@ -718,6 +763,7 @@ export function useWorkflow() {
     addProjectToCategory,
     moveProjectToCategory,
     deleteProject,
+    copyProject,
     selectProject,
     selectStep,
     addNodeToStep,

@@ -13,6 +13,7 @@ const {
   selectedProjectId, selectedProject,
   renameProject,
   addCategory, addProjectToCategory, renameCategory, removeCategory, deleteProject,
+  copyProject,
   moveProjectToCategory,
 } = useWorkflow()
 
@@ -468,6 +469,10 @@ onUnmounted(() => {
           class="w-full text-left px-3 py-1.5 text-sm text-card-foreground hover:bg-muted cursor-pointer"
           @click="startRenameProject(contextMenu!.projectId!)"
         >重命名</button>
+        <button
+          class="w-full text-left px-3 py-1.5 text-sm text-card-foreground hover:bg-muted cursor-pointer"
+          @click="copyProject(contextMenu!.projectId!); closeContextMenu()"
+        >复制项目</button>
         <!-- 移动到子菜单 -->
         <div
           v-if="contextMenu.projectId && !isProjectCompleted(projects.find(p => p.id === contextMenu!.projectId)!)"

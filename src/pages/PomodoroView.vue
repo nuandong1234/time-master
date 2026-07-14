@@ -133,7 +133,7 @@ const sortedTodoItems = computed(() => {
 
 const sortedSyncedItems = computed(() => {
   return [...syncedItems.value].sort((a, b) =>
-    b.syncedDate.localeCompare(a.syncedDate)
+    a.syncedDate.localeCompare(b.syncedDate)
   )
 })
 </script>
