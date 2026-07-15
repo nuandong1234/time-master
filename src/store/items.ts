@@ -102,7 +102,9 @@ export async function completeItem(id: number) {
   await saveItems()
 
   if (item.repeatType && item.repeatType !== "none") {
-    const next = nextRepeatDate(item.startDate, item.repeatType)
+    const today = formatDate(new Date())
+    const anchor = item.startDate > today ? item.startDate : today
+    const next = nextRepeatDate(anchor, item.repeatType)
     if (next) {
       await addItem({
         name: item.name,
