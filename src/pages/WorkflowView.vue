@@ -23,6 +23,8 @@ const flowGridRef = ref<HTMLElement | null>(null)
 const flowColumnRef = ref<HTMLDivElement | null>(null)
 const flowWrapperRef = ref<HTMLDivElement | null>(null)
 const scrollContainerRef = ref<HTMLDivElement | null>(null)
+const refreshTick = ref(0)
+let refreshTimer: ReturnType<typeof setInterval> | undefined
 
 const {
   connectionPaths,
@@ -211,6 +213,10 @@ onMounted(async () => {
   observe(flowGridRef.value)
 
   await ops.doLayoutAndScroll()
+
+  refreshTimer = setInterval(() => {
+    refreshTick.value++
+  }, 60_000)
 })
 
 onActivated(() => {
@@ -237,11 +243,13 @@ onUnmounted(() => {
   }
   document.removeEventListener("mousemove", handleDocumentMouseMove)
   resizeObserver?.disconnect()
+  clearInterval(refreshTimer)
 })
 
 const duration = computed(() => {
   const p = selectedProject.value
-  return p ? getDurationDays(p.createdAt) : 0
+  refreshTick.value // 定时刷新天数
+  return p ? getDurationDays(p.firstActivatedAt || p.createdAt) : 0
 })
 
 const runTimeDisplay = computed(() => {

@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "时间管理工具",
-  "version": "0.3.4",
+  "version": "0.3.5",
   "identifier": "com.timemaster.app",
   "build": {
     "frontendDist": "../dist",

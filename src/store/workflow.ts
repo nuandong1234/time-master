@@ -87,6 +87,7 @@ export interface WorkflowProject {
   createdAt: string
   completedAt?: string
   activatedAt?: string
+  firstActivatedAt?: string
 }
 
 export interface WorkflowCategory {
@@ -121,11 +122,15 @@ function assignState(data: any) {
   for (const cat of state.categories) {
     if (!cat.createdAt) cat.createdAt = nowDate()
   }
-  // 数据迁移：旧项目缺少 activatedAt / completedAt 的用当前时间兜底
+  // 数据迁移：旧项目缺少 activatedAt / completedAt / firstActivatedAt 的用当前时间兜底
   for (const proj of state.projects) {
     const hasActive = proj.steps.some(s => s.nodes.some(n => n.status === "active"))
     if (!proj.activatedAt && hasActive) {
       proj.activatedAt = now()
+    }
+    if (!proj.firstActivatedAt) {
+      const hasStarted = proj.steps.some(s => s.nodes.some(n => n.status !== "wait"))
+      if (hasStarted) proj.firstActivatedAt = proj.activatedAt || proj.createdAt
     }
     if (!proj.completedAt) {
       const allDone = proj.steps.length > 0 && proj.steps.every(s => s.nodes.length > 0 && s.nodes.every(n => n.status === "done"))
@@ -324,6 +329,7 @@ export async function copyProject(id: number) {
   clone.status = "wait"
   clone.completedAt = undefined
   clone.activatedAt = undefined
+  clone.firstActivatedAt = undefined
   clone.createdAt = now()
 
   // 重置步骤和节点
@@ -525,6 +531,8 @@ export async function activateNode(stepIdx: number, nodeIdx: number) {
 
   // 记录激活时间（秒级精度），每次节点激活都更新为最新操作时间，用于排序
   project.activatedAt = now()
+  // 首次激活时间，只记录一次，用于计算进行中天数
+  if (!project.firstActivatedAt) project.firstActivatedAt = now()
 
   await saveWorkflow()
 
@@ -733,8 +741,8 @@ export async function moveNodeAcrossSteps(fromStepIdx: number, fromNodeIdx: numb
   await saveWorkflow()
 }
 
-export function getDurationDays(createdAt: string) {
-  const start = new Date(createdAt)
+export function getDurationDays(startDate: string) {
+  const start = new Date(startDate)
   const now = new Date()
   const diff = Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
   return Math.max(1, diff)
