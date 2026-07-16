@@ -3,6 +3,7 @@ import { showToast } from "./toast"
 import { addItem, deleteItem } from "./items"
 import { now, nowDate } from "@/lib/datetime"
 import { dataStore } from "@/lib/data-store"
+import { createDebouncedSave } from "@/lib/debounced-save"
 
 export const DONE_CATEGORY_ID = -1
 export const DONE_CATEGORY_NAME = "已完成"
@@ -139,18 +140,22 @@ function assignState(data: any) {
   }
 }
 
+const _saveWorkflow = createDebouncedSave('workflow', async () => {
+  await dataStore.saveWorkflow({
+    categories: state.categories,
+    projects: state.projects,
+    nextCategoryId: state.nextCategoryId,
+    nextProjectId: state.nextProjectId,
+    nextStepId: state.nextStepId,
+    nextNodeId: state.nextNodeId,
+    selectedProjectId: state.selectedProjectId,
+    selectedStepIdx: state.selectedStepIdx,
+  })
+})
+
 export async function saveWorkflow() {
   try {
-    await dataStore.saveWorkflow({
-      categories: state.categories,
-      projects: state.projects,
-      nextCategoryId: state.nextCategoryId,
-      nextProjectId: state.nextProjectId,
-      nextStepId: state.nextStepId,
-      nextNodeId: state.nextNodeId,
-      selectedProjectId: state.selectedProjectId,
-      selectedStepIdx: state.selectedStepIdx,
-    })
+    await _saveWorkflow()
   } catch (e) {
     console.error('[workflow] 保存工作流失败', e)
     showToast('保存工作流失败: ' + String(e), 'error')

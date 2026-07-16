@@ -1,6 +1,7 @@
 import { reactive, computed } from "vue"
 import { formatDateTime, formatDate } from "@/lib/datetime"
 import { dataStore } from "@/lib/data-store"
+import { createDebouncedSave } from "@/lib/debounced-save"
 import { lockedItemId } from "./pomodoro"
 import { showToast } from "./toast"
 
@@ -50,12 +51,16 @@ export async function loadItems(force = false, preloadedData?: any) {
   state.loaded = true
 }
 
+const _saveItems = createDebouncedSave('items', async () => {
+  await dataStore.saveItems({
+    items: state.items,
+    nextId: state.nextId,
+  })
+})
+
 async function saveItems() {
   try {
-    await dataStore.saveItems({
-      items: state.items,
-      nextId: state.nextId,
-    })
+    await _saveItems()
   } catch (e) {
     console.error('[items] 保存事项失败', e)
     showToast('保存事项失败: ' + String(e), 'error')

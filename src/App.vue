@@ -10,6 +10,7 @@ import { loadSettings, applyTheme, setWindowSize } from "@/store/settings"
 import { useSettings } from "@/store/settings"
 import { initWorkflow } from "@/store/workflow"
 import { dataStore } from "@/lib/data-store"
+import { flushAll } from "@/lib/debounced-save"
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow"
 
 const { loadItems, resetExpiredSynced } = useItems()
@@ -25,6 +26,11 @@ const emptyData = { settings: null, items: null, workflow: null, pomodoro: null 
 
 // 自动检测日期变更的定时器
 let autoResetTimer: ReturnType<typeof setInterval> | null = null
+
+// 窗口关闭前刷出所有待写入数据
+function handleBeforeUnload() {
+  flushAll()
+}
 
 onMounted(async () => {
   // 等待数据（可能已经在 setup 阶段加载完毕了）
@@ -118,6 +124,9 @@ onMounted(async () => {
     // 用户从其他窗口/标签页切回时立即检查
     document.addEventListener("visibilitychange", handleVisibilityChange)
   }
+
+  // 关闭/刷新窗口前刷出所有待写入数据
+  window.addEventListener("beforeunload", handleBeforeUnload)
 })
 
 onUnmounted(() => {
@@ -126,6 +135,7 @@ onUnmounted(() => {
     autoResetTimer = null
   }
   document.removeEventListener("visibilitychange", handleVisibilityChange)
+  window.removeEventListener("beforeunload", handleBeforeUnload)
 })
 
 function handleVisibilityChange() {

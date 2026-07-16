@@ -1,6 +1,7 @@
 import { reactive, computed, ref } from "vue"
 import { formatDate } from "@/lib/datetime"
 import { dataStore } from "@/lib/data-store"
+import { createDebouncedSave } from "@/lib/debounced-save"
 
 const state = reactive({
   pomodoroCompleted: 0,
@@ -23,7 +24,7 @@ export async function loadPomodoroSettings(force = false, preloadedData?: any) {
   state.loaded = true
 }
 
-async function savePomodoro() {
+const _savePomodoro = createDebouncedSave('pomodoro', async () => {
   await dataStore.savePomodoro({
     pomodoroCompleted: state.pomodoroCompleted,
     pomodoroDate: state.pomodoroDate,
@@ -33,6 +34,10 @@ async function savePomodoro() {
     breakMinutes: state.breakMinutes,
     totalRounds: state.totalRounds,
   })
+})
+
+async function savePomodoro() {
+  await _savePomodoro()
 }
 
 export async function addFocusSeconds(seconds: number) {

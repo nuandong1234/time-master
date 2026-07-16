@@ -1,6 +1,7 @@
 use rusqlite::{Connection, params};
 use std::path::Path;
 use serde_json::Value;
+use std::collections::HashMap;
 
 // ── 数据库初始化 ──
 
@@ -328,72 +329,78 @@ fn load_workflow_json(conn: &Connection) -> Result<serde_json::Value, String> {
         })))
     }).map_err(|e| e.to_string())?.filter_map(|r| r.ok()).collect();
 
-    // 组装：activity → node → step → project
-    // 给 nodes 加上 activityLog
+    // 组装：activity → node → step → project（使用 HashMap 索引，O(n) 而非 O(n²)）
+    // 1. activity 按 node_id 分组
+    let mut act_by_node: HashMap<i64, Vec<serde_json::Value>> = HashMap::new();
+    for (node_id, act) in activities {
+        act_by_node.entry(node_id).or_insert_with(Vec::new).push(act);
+    }
+
+    // 2. 给 nodes 挂上 activityLog
     let nodes_with_act: Vec<(i64, i64, serde_json::Value)> = nodes.into_iter().map(|(id, step_id, mut node)| {
-        let node_acts: Vec<serde_json::Value> = activities.iter()
-            .filter(|(nid, _)| *nid == id)
-            .map(|(_, a)| a.clone())
-            .collect();
-        if !node_acts.is_empty() {
+        if let Some(acts) = act_by_node.remove(&id) {
             if let Some(obj) = node.as_object_mut() {
-                obj.insert("activityLog".to_string(), serde_json::Value::Array(node_acts));
+                obj.insert("activityLog".to_string(), serde_json::Value::Array(acts));
             }
         }
         (id, step_id, node)
     }).collect();
 
-    // 给 steps 加上 nodes
-    let steps_with_nodes: Vec<(i64, serde_json::Value)> = {
-        let mut result = Vec::new();
-        for &(step_id, project_id) in &steps {
-            let step_nodes: Vec<serde_json::Value> = nodes_with_act.iter()
-                .filter(|(_, sid, _)| *sid == step_id)
-                .map(|(_, _, n)| n.clone())
-                .collect();
-            result.push((project_id, serde_json::json!({
-                "id": step_id,
-                "nodes": step_nodes
-            })));
-        }
-        result
-    };
+    // 3. node 按 step_id 分组
+    let mut node_by_step: HashMap<i64, Vec<serde_json::Value>> = HashMap::new();
+    for (_, step_id, node_val) in nodes_with_act {
+        node_by_step.entry(step_id).or_insert_with(Vec::new).push(node_val);
+    }
 
-    // 给 projects 加上 steps
-    let projects_with_steps: Vec<serde_json::Value> = projects.into_iter().map(|(id, _cat_id, mut proj)| {
-        let proj_steps: Vec<serde_json::Value> = steps_with_nodes.iter()
-            .filter(|(pid, _)| *pid == id)
-            .map(|(_, s)| s.clone())
-            .collect();
+    // 4. 给 steps 挂上 nodes，再按 project_id 分组
+    let mut step_by_proj: HashMap<i64, Vec<serde_json::Value>> = HashMap::new();
+    for &(step_id, project_id) in &steps {
+        let step_nodes = node_by_step.remove(&step_id).unwrap_or_default();
+        step_by_proj.entry(project_id).or_insert_with(Vec::new).push(serde_json::json!({
+            "id": step_id,
+            "nodes": step_nodes
+        }));
+    }
+
+    // 5. 给 projects 挂上 steps，同时收集 project → category 映射
+    let mut proj_by_cat: HashMap<i64, Vec<serde_json::Value>> = HashMap::new();
+    let mut next_id_proj: i64 = 0;
+    let projects_with_steps: Vec<serde_json::Value> = projects.into_iter().map(|(id, cat_id, mut proj)| {
+        let proj_steps = step_by_proj.remove(&id).unwrap_or_default();
         if let Some(obj) = proj.as_object_mut() {
             obj.insert("steps".to_string(), serde_json::Value::Array(proj_steps));
         }
+        // 同时按 category 分组，用于后续给 categories 挂 projectIds
+        proj_by_cat.entry(cat_id).or_insert_with(Vec::new).push(proj.clone());
+        if id > next_id_proj { next_id_proj = id; }
         proj
     }).collect();
 
-    // 给 categories 加上 projectIds
-    for p_obj in &projects_with_steps {
-        let cat_id = p_obj.get("categoryId").and_then(|v| v.as_i64()).unwrap_or(0);
-        let pid = p_obj.get("id").and_then(|v| v.as_i64()).unwrap_or(0);
+    // 6. 给 categories 挂上 projectIds
+    for (cat_id, projs) in proj_by_cat {
         if let Some((_, cat)) = categories_map.iter_mut().find(|(id, _)| *id == cat_id) {
             if let Some(obj) = cat.as_object_mut() {
-                let ids = obj.entry("projectIds").or_insert(serde_json::Value::Array(vec![]));
-                if let Some(arr) = ids.as_array_mut() {
-                    arr.push(serde_json::json!(pid));
-                }
+                let ids: Vec<serde_json::Value> = projs.iter().map(|p| {
+                    p.get("id").cloned().unwrap_or(serde_json::Value::Null)
+                }).collect();
+                obj.insert("projectIds".to_string(), serde_json::Value::Array(ids));
             }
         }
     }
 
-    // 计算 nextId 值
+    // 计算 nextId 值（从剩余的数据结构中提取，因为 activities/nodes_with_act 已被消费）
     let max_cat_id = categories_map.iter().map(|(id, _)| *id).max().unwrap_or(0);
     let max_proj_id = projects_with_steps.iter()
         .map(|p| p.get("id").and_then(|v| v.as_i64()).unwrap_or(0))
         .max().unwrap_or(0);
     let max_step_id = steps.iter().map(|(id, _)| *id).max().unwrap_or(0);
-    let max_node_id = activities.iter().map(|(id, _)| *id)
-        .chain(nodes_with_act.iter().map(|(id, _, _)| *id))
+    let max_act_id: i64 = act_by_node.values().flat_map(|v| v.iter())
+        .filter_map(|a| a.get("id").and_then(|v| v.as_i64()))
         .max().unwrap_or(0);
+    let max_node_id: i64 = node_by_step.values().flat_map(|v| v.iter())
+        .filter_map(|n| n.get("id").and_then(|v| v.as_i64()))
+        .max().unwrap_or(0);
+    let max_node_id = max_act_id.max(max_node_id);
 
     let categories: Vec<serde_json::Value> = categories_map.into_iter()
         .map(|(_, v)| {

@@ -1,5 +1,6 @@
 import { reactive, computed } from "vue"
 import { dataStore } from "@/lib/data-store"
+import { createDebouncedSave } from "@/lib/debounced-save"
 import { invoke } from "@tauri-apps/api/core"
 import { emit } from "@tauri-apps/api/event"
 
@@ -52,7 +53,7 @@ export async function loadSettings(force = false, preloadedData?: any) {
   state.loaded = true
 }
 
-async function saveSettings() {
+const _saveSettings = createDebouncedSave('settings', async () => {
   await dataStore.saveSettings({
     theme: state.theme,
     minimizeToTray: state.minimizeToTray,
@@ -62,6 +63,10 @@ async function saveSettings() {
     debugLogging: state.debugLogging,
     debugLoggingStartedAt: state.debugLoggingStartedAt,
   })
+})
+
+async function saveSettings() {
+  await _saveSettings()
 }
 
 export async function setTheme(theme: "light" | "dark" | "system") {
