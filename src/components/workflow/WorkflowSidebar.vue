@@ -171,40 +171,64 @@ watch(pendingRenameCatId, (cid) => {
 
 async function doRename(catId: number, el: HTMLInputElement) {
   if (renamingBusy.value) return
-  if (renamingCatId.value === 0) return
   renamingBusy.value = true
+
+  // 先关输入框，让界面立即响应
+  const trimmed = el.value.trim()
+  if (!trimmed) {
+    showToast('名称不能为空')
+    renamingCatId.value = 0
+    renamingBusy.value = false
+    return
+  }
+  renamingCatId.value = 0
+
   try {
     const ok = await renameCategory(catId, el.value)
-    if (ok) {
-      renamingCatId.value = 0
+    if (!ok) {
+      // 重命名失败，重新弹出输入框
+      renamingCatId.value = catId
       await nextTick()
-    } else {
-      el.focus()
-      el.select()
+      const newEl = document.querySelector(`[data-rename="cat-${catId}"]`) as HTMLInputElement | null
+      if (newEl) {
+        newEl.focus()
+        newEl.select()
+      }
     }
   } catch (e) {
     console.error('重命名目录失败', e)
-    renamingCatId.value = 0
   }
   renamingBusy.value = false
 }
 
 async function doRenameProject(pid: number, el: HTMLInputElement) {
   if (renamingProjectBusy.value) return
-  if (renamingProjectId.value === 0) return
   renamingProjectBusy.value = true
+
+  // 先关输入框，让界面立即响应
+  const trimmed = el.value.trim()
+  if (!trimmed) {
+    showToast('名称不能为空')
+    renamingProjectId.value = 0
+    renamingProjectBusy.value = false
+    return
+  }
+  renamingProjectId.value = 0
+
   try {
     const ok = await renameProject(pid, el.value)
-    if (ok) {
-      renamingProjectId.value = 0
+    if (!ok) {
+      // 重命名失败，重新弹出输入框
+      renamingProjectId.value = pid
       await nextTick()
-    } else {
-      el.focus()
-      el.select()
+      const newEl = document.querySelector(`[data-rename="proj-${pid}"]`) as HTMLInputElement | null
+      if (newEl) {
+        newEl.focus()
+        newEl.select()
+      }
     }
   } catch (e) {
     console.error('重命名项目失败', e)
-    renamingProjectId.value = 0
   }
   renamingProjectBusy.value = false
 }
